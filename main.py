@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 
+
 # This line creates database tables automatically if they don't exist
 models.Base.metadata.create_all(bind=engine)
 
@@ -33,19 +34,19 @@ app = FastAPI()
 
 
 # Enable CORS so frontend (React/Vite etc.) can access backend APIs
+# --- ADD THIS SECTION ---
+origins = [
+    "http://localhost:5173",  # Your React/Vite dev server
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all domains (for development)
+    allow_origins=origins,            # Allows specific origins
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],              # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"],              # Allows all headers
 )
-
-# Hardcoded admin credentials (for simple admin login)
-ADMIN_EMAIL = "admin@gmail.com"
-ADMIN_PASSWORD = "admin123"
-
-
 # Dependency function to get database session
 # Every API that needs DB will use this
 def get_db():
@@ -55,7 +56,9 @@ def get_db():
     finally:
         db.close()
 
-
+# Hardcoded admin credentials (for simple admin login)
+ADMIN_EMAIL = "admin@gmail.com"
+ADMIN_PASSWORD = "admin123"
 
 #========================================== USER AUTHENTICATION APIs =============================================
 
@@ -63,43 +66,39 @@ def get_db():
 # Signup API – register new user
 @app.post("/signup")
 def signup(user: schemas.Signup, db: Session = Depends(get_db)):
-
-    # Check if user email already exists
     existing = db.query(models.User).filter(models.User.email == user.email).first()
-
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Create new user with hashed password
     new_user = models.User(
         email=user.email,
-        password=hash_password(user.password)
+        password=hash_password(user.password),
+        name=user.name # Ensure your Schema and Model have 'name'
     )
-
-    # Save user to database
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    return {"message": "Signup successful"}
+    # Return the user data so the frontend can log them in immediately
+    return {
+        "user_id": new_user.id,
+        "email": new_user.email,
+        "name": new_user.name
+    }
 
-
-# Login API – verify user credentials
 @app.post("/login")
 def login(user: schemas.Login, db: Session = Depends(get_db)):
-
-    # Check if user exists
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
 
-    if db_user is None:
-        raise HTTPException(status_code=400, detail="User not found")
+    if not db_user or not verify_password(user.password, db_user.password):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
 
-    # Verify password with hashed password
-    if not verify_password(user.password, db_user.password):
-        raise HTTPException(status_code=400, detail="Wrong password")
-
-    return {"message": "Login successful"}
-
+    return {
+        "user_id": db_user.id,
+        "email": db_user.email,
+        "name": db_user.name or "User", # Fallback if name is null
+        "language": "english"           # Add this to match your React/Schema expectations
+    }
 # Admin login API (simple hardcoded login)
 @app.post("/admin-login")
 def admin_login(user: schemas.Login):
@@ -153,66 +152,111 @@ def get_forms(db: Session = Depends(get_db)):
 # Save birth related information (part of onboarding)
 @app.post("/user/birth-data")
 def save_birth_data(data: schemas.BirthData, db: Session = Depends(get_db)):
-    # Try to get existing birth data by user_id or user_email
-    existing_birth = None
-    
-    if data.user_id:
-        existing_birth = db.query(models.BirthData).filter(models.BirthData.user_id == data.user_id).first()
-    elif data.user_email:
-        # Find user by email first
-        user = db.query(models.User).filter(models.User.email == data.user_email).first()
-        if user:
-            existing_birth = db.query(models.BirthData).filter(models.BirthData.user_id == user.id).first()
-    
-    # Update existing or create new
+
+    # ✅ USER FIND (ID ya EMAIL dono support)
+    user = None
+
+    if hasattr(data, "user_id") and data.user_id:
+        user = db.query(models.User).filter(
+            models.User.id == data.user_id
+        ).first()
+
+    if not user and hasattr(data, "user_email") and data.user_email:
+        user = db.query(models.User).filter(
+            models.User.email == data.user_email
+        ).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # ✅ USER TABLE UPDATE
+    if data.name:
+        user.name = data.name
+
+    # ✅ CHECK EXISTING BIRTH DATA
+    existing_birth = db.query(models.BirthData).filter(
+        models.BirthData.user_id == user.id
+    ).first()
+
     if existing_birth:
-        existing_birth.name = data.name or "User"
+        # 🔄 UPDATE
+        existing_birth.name = data.name
         existing_birth.dob = data.dob
         existing_birth.birth_time = data.birth_time
         existing_birth.birth_place = data.birth_place
-        existing_birth.birth_time_accuracy = str(data.birth_time_accuracy)
         existing_birth.address = data.address
+        existing_birth.birth_time_accuracy = str(data.birth_time_accuracy)
+
     else:
-        birth = models.BirthData(
-            user_id=data.user_id,
-            name=data.name or "User",
+        # ➕ CREATE NEW
+        new_birth = models.BirthData(
+            user_id=user.id,
+            name=data.name,
             dob=data.dob,
             birth_time=data.birth_time,
             birth_place=data.birth_place,
-            birth_time_accuracy=str(data.birth_time_accuracy),
-            address=data.address
+            address=data.address,
+            birth_time_accuracy=str(data.birth_time_accuracy)
         )
-        db.add(birth)
-    
+        db.add(new_birth)
+
     db.commit()
-    return {"message": "Birth data saved successfully"}
 
+    return {
+        "user_id": user.id,
+        "name": data.name,
+        "email": user.email,
+        "dob": data.dob,
+        "birth_time": data.birth_time,
+        "birth_place": data.birth_place,
+        "address": data.address,
+        "birth_time_accuracy": data.birth_time_accuracy
+    }
 
-# Get birth related information
 @app.get("/user/birth-data")
 def get_birth_data(email: str = None, user_id: int = None, db: Session = Depends(get_db)):
+
+    user = None
     birth_data = None
-    
-    if email:
+
+    # ✅ FIND USER
+    if user_id:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+
+    elif email:
         user = db.query(models.User).filter(models.User.email == email).first()
-        if user:
-            birth_data = db.query(models.BirthData).filter(models.BirthData.user_id == user.id).first()
-    elif user_id:
-        birth_data = db.query(models.BirthData).filter(models.BirthData.user_id == user_id).first()
-    
+
+    if user:
+        birth_data = db.query(models.BirthData).filter(
+            models.BirthData.user_id == user.id
+        ).first()
+
+    # ❌ NO DATA
     if not birth_data:
-        return {"dob": "", "birth_time": "", "birth_place": "", "address": "", "birth_time_accuracy": "estimated"}
-    
+        return {
+            "user_id": user.id if user else None,
+            "name": user.name if user else "",
+            "email": user.email if user else "",
+            "dob": "",
+            "birth_time": "",
+            "birth_place": "",
+            "address": "",
+            "birth_time_accuracy": "unknown",
+            "profile_pic": getattr(user, "profile_pic", "") if user else ""
+        }
+
+    # ✅ RETURN DATA
     return {
-        "name": birth_data.name,
+        "user_id": user.id,
+        "name": birth_data.name or user.name,
+        "email": user.email,
         "dob": birth_data.dob or "",
         "birth_time": birth_data.birth_time or "",
         "birth_place": birth_data.birth_place or "",
         "address": birth_data.address or "",
-        "birth_time_accuracy": birth_data.birth_time_accuracy or "estimated"
+        "birth_time_accuracy": birth_data.birth_time_accuracy or "unknown",
+        "profile_pic": getattr(user, "profile_pic", "")
     }
-
-
 # Save career profile details
 @app.post("/career/profile")
 def career_profile(profile: schemas.CareerProfile, db: Session = Depends(get_db)):
@@ -819,3 +863,21 @@ def feedback_outcome_logged(data: schemas.FeedbackOutcome, db: Session = Depends
         )
     
     return {"message": "Outcome feedback stored with logging"}
+
+from fastapi import UploadFile, File
+import shutil, os
+from fastapi.staticfiles import StaticFiles
+
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+@app.post("/upload-profile-pic")
+def upload_profile_pic(file: UploadFile = File(...)):
+    file_path = f"{UPLOAD_DIR}/{file.filename}"
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return {"image_url": f"http://127.0.0.1:8000/{file_path}"}

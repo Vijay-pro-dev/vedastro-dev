@@ -54,21 +54,28 @@ function UserForm() {
   }
 
   const handleSaveBirthData = async () => {
-    try {
-      await axios.post("http://127.0.0.1:8000/user/birth-data", {
-        user_id: userId,
-        name: formData.name,
-        dob: formData.dob,
-        birth_time: formData.birth_time,
-        birth_place: formData.birth_place,
-        birth_time_accuracy: formData.birth_time_accuracy
-      })
-      setCurrentStep(2)
-    } catch (error) {
-      console.error("Birth data error:", error)
-      alert("Error saving birth data: " + (error.response?.data?.detail || error.message))
-    }
+  try {
+
+    const res = await axios.post("http://127.0.0.1:8000/user/birth-data", {
+      user_id: userId,   // ✅ FIXED (email hata diya)
+      name: formData.name,
+      dob: formData.dob,
+      birth_time: formData.birth_time,
+      birth_place: formData.birth_place,
+      birth_time_accuracy: formData.birth_time_accuracy,
+      address: formData.address || ""   // ✅ safe
+    })
+
+    console.log("Saved:", res.data)
+
+    setCurrentStep(2)
+
+  } catch (error) {
+    console.error("Birth data error:", error)
+    alert("Error saving birth data: " + (error.response?.data?.detail || error.message))
   }
+}
+
 
   const handleSaveCareerProfile = async () => {
     try {

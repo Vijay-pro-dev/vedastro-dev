@@ -155,6 +155,7 @@ function LandingPage() {
   return (
     <div className="landing">
       {/* Navbar */}
+     {/* Navbar */}
       <nav className="navbar">
         <h2 className="logo">Vedastro</h2>
 
@@ -164,46 +165,55 @@ function LandingPage() {
               className="profile-btn"
               onClick={() => setShowProfileDropdown(!showProfileDropdown)}
             >
-              <FaUser size={18} /> {user.email?.split("@")[0]}
+              <FaUser size={18} /> {user.name || user.email?.split("@")[0]}
             </button>
 
             {showProfileDropdown && (
-              <div className="profile-dropdown">
-                <div className="dropdown-item">
-                  <strong>Username:</strong> {user.email?.split("@")[0]}
-                </div>
-                <div className="dropdown-item">
-                  <strong>Email:</strong> {user.email}
-                </div>
-                <div className="dropdown-item">
-                  <strong>Birth Date:</strong> {user.dob || "Not set"}
-                </div>
-                <div className="dropdown-item">
-                  <strong>Birth Time:</strong> {user.birth_time || "Not set"}
-                </div>
-                <div className="dropdown-item">
-                  <strong>Birth Place:</strong> {user.birth_place || "Not set"}
-                </div>
-                <div className="dropdown-item">
-                  <strong>Address:</strong> {user.address || "Not set"}
-                </div>
-                <button 
-                  className="edit-profile-btn"
-                  onClick={() => {
-                    setShowEditModal(true)
-                    setShowProfileDropdown(false)
-                  }}
-                >
-                  Edit Profile
-                </button>
-                <button 
-                  className="logout-btn"
-                  onClick={handleLogout}
-                >
-                  <FaSignOutAlt /> Sign Out
-                </button>
-              </div>
-            )}
+  <div className="profile-dropdown">
+
+    {/* Username */}
+    <div className="dropdown-item" style={{ padding: "10px" }}>
+      <strong>{user.name || user.email?.split("@")[0]}</strong>
+    </div>
+
+    {/* Profile Button */}
+    <button
+      className="dropdown-item"
+      onClick={() => {
+        navigate("/profile") // ya "/form" agar wahi profile page hai
+        setShowProfileDropdown(false)
+      }}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        padding: "10px",
+        background: "none",
+        border: "none",
+        cursor: "pointer"
+      }}
+    >
+      Profile
+    </button>
+
+    {/* Sign Out */}
+    <button
+      className="dropdown-item"
+      onClick={handleLogout}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        padding: "10px",
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: "red"
+      }}
+    >
+      <FaSignOutAlt /> Sign Out
+    </button>
+
+  </div>
+)}
           </div>
         ) : (
           <button 
@@ -214,7 +224,6 @@ function LandingPage() {
           </button>
         )}
       </nav>
-
       {/* Signup Modal */}
       {showSignupModal && !user && (
         <div className="modal-overlay" onClick={() => setShowSignupModal(false)}>

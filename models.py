@@ -8,6 +8,9 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True)
     password = Column(String)
+    name = Column(String, nullable=True)
+    language = Column(String, default="english")
+    profile_pic = Column(String, nullable=True)
 
 
 class UserInfo(Base):
@@ -31,7 +34,7 @@ class BirthData(Base):
     birth_place = Column(String)
     birth_time_accuracy = Column(String, default="unknown")  # exact, approximate, unknown, estimated_by_ai
     address = Column(String, nullable=True)
-
+    profile_pic = Column(String, nullable=True)
 
 class BirthTimeEstimate(Base):
     __tablename__ = "birth_time_estimates"
