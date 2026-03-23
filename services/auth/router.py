@@ -220,6 +220,14 @@ def login(user: Login, db: Session = Depends(get_db)):
     db_user = _get_user_by_credentials(user.email, db)
     if not db_user:
         raise HTTPException(status_code=400, detail="Invalid email or password")
+    # If this is the default admin and the supplied password matches the env password,
+    # clear lockouts before the lock check so admins don't get stuck.
+    if db_user.email == settings.admin_email.lower() and user.password == settings.admin_password:
+        db_user.failed_login_attempts = 0
+        db_user.locked_until = None
+        db.commit()
+        db.refresh(db_user)
+
     _ensure_user_not_locked(db_user)
     if getattr(db_user, "suspended", 0):
         raise HTTPException(status_code=403, detail="Account suspended. Please contact support.")

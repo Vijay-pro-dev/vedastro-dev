@@ -27,6 +27,12 @@ def ensure_default_admin(db: Session) -> models.User:
             admin.password = hash_password(DEFAULT_ADMIN_PASSWORD)
             db.commit()
             db.refresh(admin)
+        # Always clear lockouts for the default admin to avoid getting stuck.
+        if getattr(admin, "failed_login_attempts", 0) or getattr(admin, "locked_until", None):
+            admin.failed_login_attempts = 0
+            admin.locked_until = None
+            db.commit()
+            db.refresh(admin)
         return admin
 
     admin = models.User(
