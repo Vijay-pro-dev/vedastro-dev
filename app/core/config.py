@@ -63,7 +63,11 @@ class Settings:
     use_redis_rate_limit: bool = _env_bool("USE_REDIS_RATE_LIMIT", False)
     allow_credentials: bool = _env_bool("CORS_ALLOW_CREDENTIALS", True)
     cors_allow_origins: list[str] = None  # type: ignore[assignment]
-    cors_allow_origin_regex: str = os.getenv("CORS_ALLOW_ORIGIN_REGEX", r"https?://(localhost|127\.0\.0\.1)(:\d+)?$")
+    # Allow localhost and any *.vercel.app by default so prod frontend works even if env var is missed.
+    cors_allow_origin_regex: str = os.getenv(
+        "CORS_ALLOW_ORIGIN_REGEX",
+        r"https?://(localhost|127\.0\.0\.1|[a-z0-9-]+\.vercel\.app)(:\d+)?$",
+    )
     uploads_dir: str = os.getenv("UPLOADS_DIR", "storage/uploads")
     max_upload_size_bytes: int = int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(5 * 1024 * 1024)))
     allowed_upload_extensions: list[str] = None  # type: ignore[assignment]
