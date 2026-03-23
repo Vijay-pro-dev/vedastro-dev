@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.core.config import get_settings
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 
 settings = get_settings()
 DEFAULT_ADMIN_EMAIL = settings.admin_email
@@ -20,6 +20,11 @@ def ensure_default_admin(db: Session) -> models.User:
     if admin:
         if getattr(admin, "role", None) != "admin":
             admin.role = "admin"
+            db.commit()
+            db.refresh(admin)
+        # If the env password changed, sync it so ops can recover admin access without manual DB edits.
+        if not verify_password(DEFAULT_ADMIN_PASSWORD, admin.password):
+            admin.password = hash_password(DEFAULT_ADMIN_PASSWORD)
             db.commit()
             db.refresh(admin)
         return admin
