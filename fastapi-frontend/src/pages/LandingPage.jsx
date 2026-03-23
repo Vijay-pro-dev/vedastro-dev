@@ -1,29 +1,32 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { FaChartLine, FaClock, FaLightbulb, FaSignOutAlt, FaUser } from "react-icons/fa"
+import { FaChartLine, FaClock, FaChevronDown, FaLightbulb, FaSignOutAlt, FaUser } from "react-icons/fa"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
 import { getTranslations } from "../lib/i18n"
 
 function LandingPage() {
   const navigate = useNavigate()
-  const { user, logoutUser, loginUser, t } = useUser()
+  const { user, logoutUser, loginUser, updateUser } = useUser()
 
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
   const [showLoginResetFields, setShowLoginResetFields] = useState(false)
+  const [landingLanguage, setLandingLanguage] = useState(() => localStorage.getItem("landing_language") || "english")
   const [formState, setFormState] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    nationality: "india",
+    nationality: "global",
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [resetToken, setResetToken] = useState("")
   const [resetPassword, setResetPassword] = useState("")
+  const languageMenuRef = useRef(null)
   const languageByNationality = {
     india: "hindi",
     france: "french",
@@ -31,7 +34,20 @@ function LandingPage() {
     arab: "arabic",
     global: "english",
   }
-  const signupT = getTranslations(languageByNationality[formState.nationality] || "english")
+  const activeLanguage = user?.language || landingLanguage
+  const pageT = getTranslations(activeLanguage)
+  const signupT = getTranslations(languageByNationality[formState.nationality] || activeLanguage)
+
+  const languageOptions = [
+    { value: "english", label: "English (UK)" },
+    { value: "hindi", label: "हिन्दी" },
+    { value: "french", label: "Français" },
+    { value: "german", label: "Deutsch" },
+    { value: "arabic", label: "العربية" },
+  ]
+
+  const activeLanguageLabel =
+    languageOptions.find((option) => option.value === activeLanguage)?.label || "English (UK)"
 
   const resetAuthForm = () => {
     setFormState({
@@ -39,13 +55,36 @@ function LandingPage() {
       email: "",
       password: "",
       confirmPassword: "",
-      nationality: "india",
+      nationality: "global",
     })
     setError("")
     setShowLoginResetFields(false)
     setResetToken("")
     setResetPassword("")
   }
+
+  const handleLanguageChange = (language) => {
+    setLandingLanguage(language)
+    localStorage.setItem("landing_language", language)
+    if (user) {
+      updateUser({ ...user, language })
+      api.put("/profile", { language }).catch((error) => {
+        console.warn("Could not save language preference", error)
+      })
+    }
+    setShowLanguageDropdown(false)
+  }
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target)) {
+        setShowLanguageDropdown(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick)
+    return () => document.removeEventListener("mousedown", handleOutsideClick)
+  }, [])
 
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
@@ -172,45 +211,84 @@ function LandingPage() {
       <nav className="navbar">
         <h2 className="logo">Vedastro</h2>
 
-        {user ? (
-          <div className="profile-menu">
-            <button className="profile-btn" onClick={() => setShowProfileDropdown((value) => !value)}>
-              <FaUser size={18} /> {user.name || user.email?.split("@")[0]}
-            </button>
+        <div className="navbar-actions">
+          <div className="landing-language-menu" ref={languageMenuRef}>
+            <button type="button" className="landing-language-btn" onClick={() => setShowLanguageDropdown((value) => !value)}>
+                <span className="landing-language-value">{activeLanguageLabel}</span>
+                <FaChevronDown size={14} />
+              </button>
 
-            {showProfileDropdown && (
-              <div className="profile-dropdown">
-                <div className="dropdown-item">
-                  <strong>{user.name || user.email?.split("@")[0]}</strong>
-                  <span>{user.profile_completed ? t.dashboardReady : t.profilePending}</span>
-                </div>
-                <button className="dropdown-action" onClick={() => navigate("/profile")}>
-                  {t.profile}
-                </button>
-                <button
-                  className="dropdown-action"
-                  onClick={() => navigate(isAdmin ? "/admin-panel" : "/dashboard")}
-                >
-                  {isAdmin ? "Admin Panel" : t.dashboard}
-                </button>
-                <button
-                  className="dropdown-action dropdown-action-danger"
-                  onClick={() => {
-                    logoutUser()
-                    setShowProfileDropdown(false)
-                    navigate("/")
-                  }}
-                >
-                  <FaSignOutAlt /> {t.signOut}
-                </button>
+            {showLanguageDropdown && (
+              <div className="landing-language-dropdown">
+                {languageOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`landing-language-option ${activeLanguage === option.value ? "active" : ""}`}
+                    onClick={() => handleLanguageChange(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
-        ) : (
-          <button className="login-btn" onClick={() => setShowLoginModal(true)}>
-            Login
-          </button>
-        )}
+
+          {user ? (
+            <div className="profile-menu">
+              <button
+                type="button"
+                className="profile-btn"
+                onClick={() => {
+                  setShowLanguageDropdown(false)
+                  setShowProfileDropdown((value) => !value)
+                }}
+              >
+                <FaUser size={18} /> {user.name || user.email?.split("@")[0]}
+              </button>
+
+              {showProfileDropdown && (
+                <div className="profile-dropdown">
+                  <div className="dropdown-item">
+                    <strong>{user.name || user.email?.split("@")[0]}</strong>
+                    <span>{user.profile_completed ? pageT.dashboardReady : pageT.profilePending}</span>
+                  </div>
+                  <button type="button" className="dropdown-action" onClick={() => navigate("/profile")}>
+                    {pageT.profile}
+                  </button>
+                  <button
+                    type="button"
+                    className="dropdown-action"
+                    onClick={() => navigate(isAdmin ? "/admin-panel" : "/dashboard")}
+                  >
+                    {isAdmin ? "Admin Panel" : pageT.dashboard}
+                  </button>
+                  <button
+                    type="button"
+                    className="dropdown-action dropdown-action-danger"
+                    onClick={() => {
+                      logoutUser()
+                      setShowProfileDropdown(false)
+                      navigate("/")
+                    }}
+                  >
+                    <FaSignOutAlt /> {pageT.signOut}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              className="login-btn"
+              onClick={() => {
+                setShowLanguageDropdown(false)
+                setShowLoginModal(true)
+              }}
+            >
+              Login
+            </button>
+          )}
+        </div>
       </nav>
 
       {showSignupModal && !user && (
@@ -294,8 +372,8 @@ function LandingPage() {
           resetAuthForm()
         }}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
-            <h2>Login</h2>
-            <p>Your saved dashboard will open after login.</p>
+            <h2>{pageT.login}</h2>
+            <p>{pageT.loginSub}</p>
             <form
               onSubmit={(event) => {
                 event.preventDefault()
@@ -352,16 +430,28 @@ function LandingPage() {
       <section className="hero">
         <div className="overlay" />
         <div className="hero-content">
-          <h1>{t.heroTitle}</h1>
-          <p>{t.heroSub}</p>
+          <h1>{pageT.heroTitle}</h1>
+          <p>{pageT.heroSub}</p>
 
           {!user && (
             <div className="buttons">
-              <button className="btn primary" onClick={() => setShowSignupModal(true)}>
-                {t.startFreeAnalysis}
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setShowLanguageDropdown(false)
+                  setShowSignupModal(true)
+                }}
+              >
+                {pageT.startFreeAnalysis}
               </button>
-              <button className="btn secondary" onClick={() => setShowLoginModal(true)}>
-                {t.login}
+              <button
+                className="btn secondary"
+                onClick={() => {
+                  setShowLanguageDropdown(false)
+                  setShowLoginModal(true)
+                }}
+              >
+                {pageT.login}
               </button>
             </div>
           )}
@@ -383,11 +473,11 @@ function LandingPage() {
                 {primaryAction === "admin-panel"
                   ? "Admin Panel"
                   : primaryAction === "dashboard"
-                    ? t.dashboard
-                    : t.completeProfile}
+                    ? pageT.dashboard
+                    : pageT.completeProfile}
               </button>
               <button className="btn secondary" onClick={() => navigate("/profile")}>
-                {t.profile}
+                {pageT.profile}
               </button>
             </div>
           )}
@@ -395,22 +485,22 @@ function LandingPage() {
       </section>
 
       <section className="features">
-        <h2>{t.builtFor}</h2>
+        <h2>{pageT.builtFor}</h2>
         <div className="feature-grid">
           <div className="feature">
             <FaChartLine size={30} color="#4a6cf7" />
-            <h3>{t.dynamicScore}</h3>
-            <p>{t.dynamicScoreSub}</p>
+            <h3>{pageT.dynamicScore}</h3>
+            <p>{pageT.dynamicScoreSub}</p>
           </div>
           <div className="feature">
             <FaClock size={30} color="#4a6cf7" />
-            <h3>{t.savedWindow}</h3>
-            <p>{t.savedWindowSub}</p>
+            <h3>{pageT.savedWindow}</h3>
+            <p>{pageT.savedWindowSub}</p>
           </div>
           <div className="feature">
             <FaLightbulb size={30} color="#4a6cf7" />
-            <h3>{t.aiRecommendations}</h3>
-            <p>{t.aiRecommendationsSub}</p>
+            <h3>{pageT.aiRecommendations}</h3>
+            <p>{pageT.aiRecommendationsSub}</p>
           </div>
         </div>
       </section>

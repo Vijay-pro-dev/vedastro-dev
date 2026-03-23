@@ -171,7 +171,6 @@ function ProfilePage() {
       <div className="profile-page-header">
         <div>
           <h1>{t.myProfile}</h1>
-          <p>Your saved SaaS profile stays connected to your dashboard, recommendations, and login flow.</p>
         </div>
         <div className="profile-page-status">
           <span className={`profile-badge ${user?.profile_completed ? "ready" : "pending"}`}>
