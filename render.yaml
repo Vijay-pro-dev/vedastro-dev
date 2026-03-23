@@ -28,7 +28,7 @@ services:
         value: "587"
       - key: SMTP_USERNAME
         sync: false
-      - key: SMTP_PASSWORD
+      - key: SMTP_PASSWORDn
         sync: false
       - key: SMTP_USE_TLS
         value: "true"
