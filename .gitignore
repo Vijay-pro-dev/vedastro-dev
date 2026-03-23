@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.pytest_tmp/
+pytest_tmp/
+pytest-cache-files-*/
+test_runtime/
+
+# Virtual environments
+.venv/
+venv/
+
+# Local database and uploads
+users.db
+uploads/
+backend/users.db
+backend/uploads/
+backend/storage/users.db
+backend/storage/uploads/
+
+# Frontend build artifacts
+fastapi-frontend/node_modules/
+fastapi-frontend/dist/
+frontend/node_modules/
+frontend/dist/
+
+# Local logs
+backend.log
+backend.err.log
+backend/backend.log
+backend/backend.err.log
+backend/logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+backend/.env
+backend/.env.dev.local
+backend/.env.prod.local
+fastapi-frontend/.env.local

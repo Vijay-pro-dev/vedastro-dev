@@ -1,0 +1,186 @@
+{
+  "info": {
+    "name": "Vedastro API",
+    "_postman_id": "b570d43d-6d34-4a1f-9c35-vedastro-collection",
+    "description": "Postman collection for auth, profile, dashboard, and admin flows.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "user_token", "value": "" },
+    { "key": "admin_token", "value": "" },
+    { "key": "user_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/health"
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo User\",\n  \"email\": \"demo@example.com\",\n  \"password\": \"DemoPass123\",\n  \"nationality\": \"india\"\n}"
+            },
+            "url": "{{base_url}}/signup"
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@example.com\",\n  \"password\": \"DemoPass123\"\n}"
+            },
+            "url": "{{base_url}}/login"
+          }
+        },
+        {
+          "name": "Auth Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "url": "{{base_url}}/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "url": "{{base_url}}/profile"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo User\",\n  \"phone\": \"9999999999\",\n  \"dob\": \"1998-04-14\",\n  \"birth_time\": \"09:15\",\n  \"birth_place\": \"Delhi\",\n  \"education\": \"B.Tech\",\n  \"interests\": \"AI, Product\",\n  \"goals\": \"Senior Product Role\",\n  \"current_role\": \"Analyst\",\n  \"years_experience\": 3,\n  \"goal_clarity\": \"high\",\n  \"role_match\": \"medium\"\n}"
+            },
+            "url": "{{base_url}}/profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Career Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "url": "{{base_url}}/career/dashboard"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@gmail.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": "{{base_url}}/admin-login"
+          }
+        },
+        {
+          "name": "Admin Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/admin/dashboard"
+          }
+        },
+        {
+          "name": "Admin User Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/admin/users/{{user_id}}"
+          }
+        },
+        {
+          "name": "Suspend User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"suspended\": true\n}"
+            },
+            "url": "{{base_url}}/admin/users/{{user_id}}/suspend"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/admin/users/{{user_id}}"
+          }
+        },
+        {
+          "name": "Export Users CSV",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/admin/export/users.csv"
+          }
+        }
+      ]
+    }
+  ]
+}

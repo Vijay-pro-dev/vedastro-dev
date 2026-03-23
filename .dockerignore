@@ -1,0 +1,11 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+users.db
+uploads
+backend.log
+backend.err.log
+fastapi-frontend/node_modules
+fastapi-frontend/dist

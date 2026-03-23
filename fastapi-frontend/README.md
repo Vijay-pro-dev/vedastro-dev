@@ -1,16 +1,40 @@
-# React + Vite
+# Vedastro Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite frontend for the Vedastro SaaS dashboard.
 
-Currently, two official plugins are available:
+## Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `src/pages`
+  - route-level screens such as landing, login, signup, dashboard, profile, and admin
+- `src/components/dashboard`
+  - dashboard-only reusable UI blocks
+- `src/components/profile`
+  - profile flow helpers such as birth time questionnaire
+- `src/components/shared`
+  - route guards and shared helpers used across screens
+- `src/context`
+  - global user session and translation-aware app state
+- `src/lib`
+  - API client and i18n helpers
+- `src/assets`
+  - static frontend assets
 
-## React Compiler
+## Common Commands
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Install dependencies:
 
-## Expanding the ESLint configuration
+```bash
+npm install
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Run dev server:
+
+```bash
+npm run dev
+```
+
+Create production build:
+
+```bash
+npm run build
+```

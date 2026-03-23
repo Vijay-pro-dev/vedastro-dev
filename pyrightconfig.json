@@ -1,0 +1,18 @@
+{
+  "include": [
+    ".",
+    "backend",
+    "fastapi-frontend"
+  ],
+  "extraPaths": [
+    "backend"
+  ],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": [
+        "backend"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "files.exclude": {
+    "**/__pycache__": true,
+    ".pytest_tmp": true,
+    "pytest_tmp": true,
+    "pytest-cache-files-*": true,
+    "test_runtime": true,
+    ".venv": true,
+    "venv": true
+  },
+  "search.exclude": {
+    "**/__pycache__": true,
+    ".pytest_tmp": true,
+    "pytest_tmp": true,
+    "pytest-cache-files-*": true,
+    "test_runtime": true,
+    ".venv": true,
+    "venv": true,
+    "fastapi-frontend/node_modules": true,
+    "fastapi-frontend/dist": true
+  },
+  "files.watcherExclude": {
+    "**/__pycache__/**": true,
+    ".pytest_tmp/**": true,
+    "pytest_tmp/**": true,
+    "pytest-cache-files-*/**": true,
+    "test_runtime/**": true,
+    ".venv/**": true,
+    "venv/**": true,
+    "fastapi-frontend/node_modules/**": true,
+    "fastapi-frontend/dist/**": true
+  }
+}
