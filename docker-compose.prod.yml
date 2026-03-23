@@ -1,10 +1,10 @@
 services:
   api:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     env_file:
-      - ./backend/.env.prod
+      - ./.env.prod
     volumes:
       - uploads_data:/app/storage/uploads
     depends_on:
@@ -15,7 +15,7 @@ services:
 
   frontend:
     build:
-      context: ./fastapi-frontend
+      context: ./frontend
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: http://localhost:8000

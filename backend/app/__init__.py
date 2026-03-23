@@ -1,1 +1,0 @@
-"""Vedastro backend package."""

@@ -1,0 +1,1 @@
+"""Vedastro admin service package."""

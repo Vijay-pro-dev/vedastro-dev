@@ -1,0 +1,1 @@
+"""Vedastro auth service package."""

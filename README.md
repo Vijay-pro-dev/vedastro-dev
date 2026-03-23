@@ -37,7 +37,8 @@ Vedastro ek full-stack SaaS web application hai jo secure auth, multilingual onb
 
 ### Engineering Quality
 
-- Backend organized into `core`, `models`, `routes`, `schemas`, and `services`.
+- Backend organized into `core`, `models`, `schemas`, and shared services.
+- Feature routers live in service folders under `services/`.
 - Frontend organized into `pages`, `components`, `context`, and `lib`.
 - Lazy-loaded frontend routes.
 - Toast-based error and success handling.
@@ -47,14 +48,17 @@ Vedastro ek full-stack SaaS web application hai jo secure auth, multilingual onb
 
 ## Folders
 
-- `backend/`
-  - FastAPI app
-  - Alembic migrations
-  - API tests
-  - backend Docker files and env templates
-- `fastapi-frontend/`
+- `app/`
+  - Shared FastAPI backend core, models, schemas, and business helpers
+- `frontend/`
   - React + Vite frontend
   - dev and production frontend Docker files
+- `services/`
+  - feature routers and service entrypoints
+- `gateway/`
+  - API gateway entrypoint
+- `shared/`
+  - common helpers used by multiple services
 - `docker-compose.yml`
   - development Docker workflow with live code updates
 - `docker-compose.prod.yml`
@@ -64,9 +68,11 @@ Vedastro ek full-stack SaaS web application hai jo secure auth, multilingual onb
 
 The project has two main parts:
 
-- `backend/`
-  - FastAPI APIs, database access, auth, profile, dashboard, and admin logic
-- `fastapi-frontend/`
+- `app/`
+  - shared backend core, database, models, schemas, and helpers
+- `services/`
+  - auth, dashboard, profile, admin, and other feature routers
+- `frontend/`
   - React UI for landing page, login, signup, profile, dashboard, and admin panel
 
 High-level user flow:
@@ -84,6 +90,29 @@ High-level admin flow:
 1. Admin logs in.
 2. Admin panel loads user stats and activity logs.
 3. Admin can inspect users, update roles, suspend users, delete users, and export data.
+
+## Microservices Layout
+
+The repo is now organized in a microservices-style layout:
+
+- `gateway/`
+  - API gateway entrypoint
+- `services/auth/`
+  - auth service entrypoint and auth router
+- `services/health/`
+  - health and readiness service
+- `services/career/`
+  - career dashboard and profile routers
+- `services/admin/`
+  - admin service entrypoint and admin router
+- `services/relationship/`
+  - future service scaffold
+- `services/finance/`
+  - future service scaffold
+- `shared/`
+  - shared helpers for the service split
+
+The running behavior stays the same, but the code now lives in the folder that matches its responsibility.
 
 ## Email Setup
 
@@ -117,57 +146,61 @@ If SMTP is not configured, the app still works, but the reset and verification e
 
 ## Important Backend Files
 
-- `backend/main.py`
-  - backend entrypoint used when running the API from the `backend/` folder
-- `backend/app/main.py`
+- `app/main.py`
   - creates the FastAPI app, mounts middleware, routes, logging, and startup logic
-- `backend/app/core/config.py`
+- `app/core/config.py`
   - loads env-based settings
-- `backend/app/core/database.py`
+- `app/core/database.py`
   - creates database engine and session
-- `backend/app/core/security.py`
+- `app/core/security.py`
   - JWT and password helpers
-- `backend/app/core/security_middleware.py`
+- `app/core/security_middleware.py`
   - request security and rate-limiting middleware
-- `backend/app/routes/`
-  - API endpoints
-- `backend/app/services/`
+- `services/auth/router.py`
+  - auth API endpoints
+- `services/career/router.py`
+  - dashboard and career API endpoints
+- `services/career/profile_router.py`
+  - profile API endpoints
+- `services/admin/router.py`
+  - admin API endpoints
+- `app/services/`
   - business logic
-- `backend/app/models/user.py`
+- `app/models/user.py`
   - database models
-- `backend/alembic/`
+- `alembic/`
   - database migrations
-- `backend/tests/`
+- `tests/`
   - backend API tests
 
 ## Important Frontend Files
 
-- `fastapi-frontend/src/App.jsx`
+- `frontend/src/App.jsx`
   - route definitions
-- `fastapi-frontend/src/context/UserContext.jsx`
+- `frontend/src/context/UserContext.jsx`
   - user session, token state, and translation-aware app state
-- `fastapi-frontend/src/lib/api.js`
+- `frontend/src/lib/api.js`
   - API client
-- `fastapi-frontend/src/lib/i18n.js`
+- `frontend/src/lib/i18n.js`
   - multilingual UI helper
-- `fastapi-frontend/src/pages/`
+- `frontend/src/pages/`
   - route-level screens
-- `fastapi-frontend/src/components/shared/`
+- `frontend/src/components/shared/`
   - shared route guards
-- `fastapi-frontend/src/components/dashboard/`
+- `frontend/src/components/dashboard/`
   - dashboard-only UI pieces
-- `fastapi-frontend/src/components/profile/`
+- `frontend/src/components/profile/`
   - profile flow helpers
 
 ## Data Locations
 
-- `backend/storage/users.db`
+- `storage/users.db`
   - local SQLite database for development
-- `backend/storage/uploads/`
+- `storage/uploads/`
   - uploaded profile images and related files
-- `backend/logs/backend.log`
+- `logs/backend.log`
   - request and application log file
-- `backend/logs/backend.err.log`
+- `logs/backend.err.log`
   - security and error log file
 
 ## Common Commands
@@ -181,46 +214,44 @@ docker compose up --build
 Backend tests:
 
 ```bash
-cd backend
 ..\venv\Scripts\python.exe -m pytest -q
 ```
 
 Backend dev server:
 
 ```bash
-cd backend
 ..\venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Frontend build:
 
 ```bash
-cd fastapi-frontend
+cd frontend
 npm run build
 ```
 
 Frontend dev server:
 
 ```bash
-cd fastapi-frontend
+cd frontend
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
 ## Adding New Features
 
 - For a new backend API:
-  - add route logic in `backend/app/routes/`
-  - add business logic in `backend/app/services/`
-  - add request/response schemas in `backend/app/schemas/`
+- add route logic in `services/`
+  - add business logic in `app/services/`
+  - add request/response schemas in `app/schemas/`
 - For a database change:
-  - update models in `backend/app/models/`
+  - update models in `app/models/`
   - create or update Alembic migration files
 - For a new frontend screen:
-  - add a file in `fastapi-frontend/src/pages/`
+  - add a file in `frontend/src/pages/`
 - For reusable frontend UI:
-  - add components in `fastapi-frontend/src/components/`
+  - add components in `frontend/src/components/`
 - For shared frontend helpers:
-  - use `fastapi-frontend/src/lib/` or `fastapi-frontend/src/context/`
+  - use `frontend/src/lib/` or `frontend/src/context/`
 
 ## Project Rules
 

@@ -1,0 +1,162 @@
+services:
+  - type: web
+    name: vedastro-gateway
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn gateway.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        value: https://your-frontend-domain.com
+      - key: FRONTEND_BASE_URL
+        value: https://your-frontend-domain.com
+      - key: SECRET_KEY
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: USE_REDIS_RATE_LIMIT
+        value: "false"
+
+  - type: web
+    name: vedastro-auth
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.auth.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        value: https://your-frontend-domain.com
+      - key: FRONTEND_BASE_URL
+        value: https://your-frontend-domain.com
+      - key: SECRET_KEY
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: USE_REDIS_RATE_LIMIT
+        value: "false"
+
+  - type: web
+    name: vedastro-admin
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.admin.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        value: https://your-frontend-domain.com
+      - key: FRONTEND_BASE_URL
+        value: https://your-frontend-domain.com
+      - key: SECRET_KEY
+        sync: false
+      - key: USE_REDIS_RATE_LIMIT
+        value: "false"
+
+  - type: web
+    name: vedastro-career
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.career.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        value: https://your-frontend-domain.com
+      - key: FRONTEND_BASE_URL
+        value: https://your-frontend-domain.com
+      - key: SECRET_KEY
+        sync: false
+      - key: USE_REDIS_RATE_LIMIT
+        value: "false"
+
+  - type: web
+    name: vedastro-health
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.health.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: USE_REDIS_RATE_LIMIT
+        value: "false"
+
+  - type: web
+    name: vedastro-relationship
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.relationship.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: USE_REDIS_RATE_LIMIT
+        value: "false"
+
+  - type: web
+    name: vedastro-finance
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.finance.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: USE_REDIS_RATE_LIMIT
+        value: "false"
