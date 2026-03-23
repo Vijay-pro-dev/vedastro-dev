@@ -224,8 +224,14 @@ def login(user: Login, db: Session = Depends(get_db)):
     if getattr(db_user, "suspended", 0):
         raise HTTPException(status_code=403, detail="Account suspended. Please contact support.")
     if not verify_password(user.password, db_user.password):
-        _mark_failed_login(db, db_user)
-        raise HTTPException(status_code=400, detail="Invalid email or password")
+        # If this is the default admin and the env password has changed, sync it on-the-fly.
+        if user.email.lower() == settings.admin_email.lower() and user.password == settings.admin_password:
+            db_user.password = hash_password(user.password)
+            db.commit()
+            db.refresh(db_user)
+        else:
+            _mark_failed_login(db, db_user)
+            raise HTTPException(status_code=400, detail="Invalid email or password")
 
     _reset_login_failures(db_user)
     create_activity_log(
