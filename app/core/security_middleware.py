@@ -113,6 +113,10 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         query_string = request.url.query.lower()
         user_agent = request.headers.get("user-agent", "").lower()
 
+        # Let CORS preflight pass through without WAF/rate limits.
+        if request.method.upper() == "OPTIONS":
+            return await call_next(request)
+
         if any(pattern in path or pattern in query_string for pattern in self.BLOCKED_PATTERNS) or any(
             agent in user_agent for agent in self.BLOCKED_USER_AGENTS
         ):
