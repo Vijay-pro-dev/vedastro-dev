@@ -119,7 +119,11 @@ def _reset_login_failures(user: models.User) -> None:
 
 
 def _decode_typed_token(token: str, expected_type: str) -> dict:
-    payload = decode_access_token(token)
+    try:
+        payload = decode_access_token(token)
+    except Exception as exc:
+        # If the signing secret changed or the token is tampered/expired, return a clean 401 instead of 500
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token") from exc
     if payload.get("type") != expected_type:
         raise HTTPException(status_code=400, detail=f"Invalid {expected_type.replace('_', ' ')} token")
     return payload

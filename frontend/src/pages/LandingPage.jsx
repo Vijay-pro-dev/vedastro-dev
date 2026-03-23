@@ -20,23 +20,15 @@ function LandingPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    nationality: "global",
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [resetToken, setResetToken] = useState("")
   const [resetPassword, setResetPassword] = useState("")
   const languageMenuRef = useRef(null)
-  const languageByNationality = {
-    india: "hindi",
-    france: "french",
-    germany: "german",
-    arab: "arabic",
-    global: "english",
-  }
   const activeLanguage = user?.language || landingLanguage
   const pageT = getTranslations(activeLanguage)
-  const signupT = getTranslations(languageByNationality[formState.nationality] || activeLanguage)
+  const signupT = pageT
 
   const languageOptions = [
     { value: "english", label: "English (UK)" },
@@ -55,7 +47,6 @@ function LandingPage() {
       email: "",
       password: "",
       confirmPassword: "",
-      nationality: "global",
     })
     setError("")
     setShowLoginResetFields(false)
@@ -132,7 +123,6 @@ function LandingPage() {
         name: formState.name || "User",
         email: trimmedEmail,
         password: formState.password,
-        nationality: formState.nationality,
       })
 
       const me = await api.get("/auth/me", {
@@ -305,20 +295,6 @@ function LandingPage() {
                 handleAuth("signup")
               }}
             >
-              <div className="modal-input-group">
-                <label className="modal-label">{signupT.nationality}</label>
-                <select
-                  className="modal-select"
-                  value={formState.nationality}
-                  onChange={(event) => setFormState((current) => ({ ...current, nationality: event.target.value }))}
-                >
-                  <option value="india">{signupT.india}</option>
-                  <option value="france">{signupT.france}</option>
-                  <option value="germany">{signupT.germany}</option>
-                  <option value="arab">{signupT.arab}</option>
-                  <option value="global">{signupT.global}</option>
-                </select>
-              </div>
               <div className="modal-input-group">
                 <input
                   type="text"
