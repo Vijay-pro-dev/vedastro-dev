@@ -115,7 +115,12 @@ function Signup() {
       showSuccess("Account created successfully.")
       navigate("/form", { replace: true })
     } catch (err) {
-      const message = err.response?.data?.detail || "Signup failed. Please try again."
+      const apiDetail =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.response?.data?.errors?.[0]?.msg
+      const message = apiDetail || "Signup failed. Please try again."
       setError(message)
       showError(message)
     } finally {

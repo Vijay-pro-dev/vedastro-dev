@@ -66,7 +66,12 @@ function Login() {
       showSuccess("Login successful.")
       navigate("/", { replace: true })
     } catch (err) {
-      const message = err.response?.data?.detail || "Login failed"
+      const apiDetail =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.response?.data?.errors?.[0]?.msg
+      const message = apiDetail || "Login failed. Please check your email and password."
       setError(message)
       showError(message)
     } finally {

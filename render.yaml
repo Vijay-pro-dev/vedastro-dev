@@ -27,9 +27,9 @@ services:
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USERNAME
-        sync: false
-      - key: SMTP_PASSWORDn
-        sync: false
+        value: omjig017@gmail.com
+      - key: SMTP_PASSWORD
+        value: nizcjkhdgfnuqogs
       - key: SMTP_USE_TLS
         value: "true"
       - key: USE_REDIS_RATE_LIMIT
@@ -63,9 +63,9 @@ services:
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USERNAME
-        sync: false
+        value: omjig017@gmail.com
       - key: SMTP_PASSWORD
-        sync: false
+        value: nizcjkhdgfnuqogs
       - key: SMTP_USE_TLS
         value: "true"
       - key: USE_REDIS_RATE_LIMIT
