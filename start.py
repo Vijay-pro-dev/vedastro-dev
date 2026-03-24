@@ -39,7 +39,7 @@ def start_api() -> None:
         os.getenv("PORT", "8000"),
     ]
     if os.getenv("UVICORN_RELOAD", "false").strip().lower() in {"1", "true", "yes", "on"}:
-        command.append("--reload")
+        command += ["--reload", "--reload-exclude", "venv", "--reload-exclude", ".git"]
     raise SystemExit(subprocess.call(command))
 
 

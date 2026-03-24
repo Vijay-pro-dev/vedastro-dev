@@ -41,3 +41,5 @@ backend/.env
 backend/.env.dev.local
 backend/.env.prod.local
 fastapi-frontend/.env.local
+.env
+.env.*

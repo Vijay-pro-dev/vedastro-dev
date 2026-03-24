@@ -260,10 +260,11 @@ text-align:center;
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   position: relative;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
+  margin-left: auto;
 }
 
 /* Landing page language selector button */
@@ -276,8 +277,8 @@ text-align:center;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  min-width: 118px;
-  padding: 7px 9px;
+  min-width: 90px;
+  padding: 7px 7px;
   border-radius: 10px;
   border: 1px solid rgba(0, 245, 255, 0.2);
   background: rgba(20, 26, 46, 0.35);
@@ -288,6 +289,7 @@ text-align:center;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(12px);
   transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+  line-height: 1.2;
 }
 
 .landing-language-btn:hover {
@@ -344,11 +346,65 @@ text-align:center;
 @media (max-width: 768px) {
   .navbar-actions {
     gap: 10px;
+    width: auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    margin-left: auto;
+  }
+
+  .landing-language-menu {
+    flex: 0 1 120px;
   }
 
   .landing-language-btn,
   .landing-language-dropdown {
-    min-width: 136px;
+    min-width: 95px;
+    font-size: 11px;
+    padding: 6px 6px;
+  }
+}
+
+@media (max-width: 520px) {
+  .navbar {
+    padding: 12px 14px;
+  }
+  .navbar-actions {
+    gap: 8px;
+    width: auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    margin-left: auto;
+  }
+  .landing-language-menu {
+    flex: 0 0 105px;
+    max-width: 115px;
+  }
+  .landing-language-btn,
+  .landing-language-dropdown {
+    min-width: 0;
+    width: 100%;
+    padding: 4px 6px;
+    font-size: 10px;
+    border-radius: 7px;
+    box-shadow: none;
+  }
+  .landing-language-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .profile-menu {
+    flex: 0 0 auto;
+    max-width: 130px;
+  }
+  .profile-btn {
+    padding: 6px 9px;
+    font-size: 11px;
+    border-radius: 10px;
+    gap: 6px;
+  }
+  .profile-btn svg {
+    width: 16px;
+    height: 16px;
   }
 }
 /* Landing page hero section */
