@@ -13,6 +13,7 @@ function UserForm() {
   const [showQuestionnaire, setShowQuestionnaire] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(true)
 
   const [birthTimeKnowledge, setBirthTimeKnowledge] = useState("yes")
   const [formData, setFormData] = useState({
@@ -36,6 +37,12 @@ function UserForm() {
 
   useEffect(() => {
     const loadProfile = async () => {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        // unauthenticated: start with blank form, skip fetch
+        setLoading(false)
+        return
+      }
       try {
         const response = await api.get("/profile")
         const profile = response.data
@@ -65,6 +72,7 @@ function UserForm() {
         console.error("Failed to load profile", error)
         showError("Could not load your saved profile data.")
       }
+      setLoading(false)
     }
 
     // Initial profile bootstrap is intentionally a one-time load.
@@ -136,6 +144,14 @@ function UserForm() {
       showError("Please fix the highlighted personal profile fields.")
       return
     }
+    const token = localStorage.getItem("token")
+    if (!token) {
+      // guest flow: keep data locally and move ahead
+      localStorage.setItem("guest_profile_draft", JSON.stringify({ formData, careerData }))
+      setCurrentStep(2)
+      showSuccess("Profile saved locally. Create an account later to sync.")
+      return
+    }
     setSaving(true)
     try {
       const response = await api.put("/profile", {
@@ -154,6 +170,13 @@ function UserForm() {
   const handleSaveCareerProfile = async () => {
     if (!validateCareerStep()) {
       showError("Please fix the highlighted career profile fields.")
+      return
+    }
+    const token = localStorage.getItem("token")
+    if (!token) {
+      localStorage.setItem("guest_profile_draft", JSON.stringify({ formData, careerData }))
+      showSuccess("Profile saved locally. Sign up later to keep it in your account.")
+      navigate("/dashboard", { state: { guestProfile: { ...formData, ...careerData } } })
       return
     }
     setSaving(true)
@@ -181,6 +204,18 @@ function UserForm() {
           setCurrentStep(1)
         }}
       />
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="page-container">
+        <div className="skeleton-card">
+          <div className="skeleton-line" />
+          <div className="skeleton-line" />
+          <div className="skeleton-line short" />
+        </div>
+      </div>
     )
   }
 

@@ -16,6 +16,8 @@ const Login = lazy(() => import("./pages/Login"))
 const ProfilePage = lazy(() => import("./pages/ProfilePage"))
 const Signup = lazy(() => import("./pages/Signup"))
 const UserForm = lazy(() => import("./pages/UserForm"))
+const Questionnaire = lazy(() => import("./pages/Questionnaire"))
+const Results = lazy(() => import("./pages/Results"))
 
 function App() {
   return (
@@ -36,22 +38,10 @@ function App() {
                   </AdminRoute>
                 }
               />
-              <Route
-                path="/form"
-                element={
-                  <ProtectedRoute>
-                    <UserForm />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/form" element={<UserForm />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/questionnaire" element={<Questionnaire />} />
+              <Route path="/newdashboard" element={<Results />} />
               <Route
                 path="/profile"
                 element={

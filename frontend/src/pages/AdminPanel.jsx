@@ -18,6 +18,58 @@ import { api } from "../lib/api"
 const USER_PAGE_SIZE = 10
 const ACTIVITY_PAGE_SIZE = 12
 const chartColors = ["#22d3ee", "#38bdf8", "#4ade80", "#facc15", "#f97316"]
+const LOCAL_QUESTION_CACHE_KEY = "vedastro_admin_questions_cache"
+
+const QUESTION_SEED = [
+  { question_text: "Do you have a clear long-term career goal?", section: "Awareness", display_order: 1 },
+  { question_text: "Do you know the skills required for your goal?", section: "Awareness", display_order: 2 },
+  { question_text: "Have you consciously chosen your career path?", section: "Awareness", display_order: 3 },
+  { question_text: "Do you clearly understand your strengths and weaknesses?", section: "Awareness", display_order: 4 },
+  { question_text: "Do you know which role/job suits you best?", section: "Awareness", display_order: 5 },
+  { question_text: "Are you aware of industry trends and demand?", section: "Awareness", display_order: 6 },
+  { question_text: "Do you regularly evaluate your career direction?", section: "Awareness", display_order: 7 },
+  { question_text: "Are you actively exploring job or career opportunities?", section: "Alignment / Time", display_order: 8 },
+  { question_text: "Are you receiving interviews or responses recently?", section: "Alignment / Time", display_order: 9 },
+  { question_text: "Is your network helping you with opportunities?", section: "Alignment / Time", display_order: 10 },
+  { question_text: "Is your profile (CV/LinkedIn/portfolio) strong?", section: "Alignment / Time", display_order: 11 },
+  { question_text: "Are you applying to the right roles?", section: "Alignment / Time", display_order: 12 },
+  { question_text: "Do you feel this is the right time for growth in your career?", section: "Alignment / Time", display_order: 13 },
+  { question_text: "Do you spend time daily on career improvement?", section: "Action", display_order: 14 },
+  { question_text: "Are you actively learning new skills?", section: "Action", display_order: 15 },
+  { question_text: "Have you created any project/output in the last 30 days?", section: "Action", display_order: 16 },
+  { question_text: "Are you consistently applying or doing outreach?", section: "Action", display_order: 17 },
+  { question_text: "Are you able to control distractions?", section: "Action", display_order: 18 },
+  { question_text: "Do you follow a disciplined routine?", section: "Action", display_order: 19 },
+  { question_text: "Do you track your progress regularly?", section: "Action", display_order: 20 },
+].map((item, index) => ({
+  ...item,
+  id: `seed-${index + 1}`,
+  answer_type: "radio",
+  score: 3,
+  is_required: true,
+  is_active: true,
+  user_type_code: "GENERAL",
+}))
+
+const USER_TYPE_OPTIONS = [
+  { code: "GENERAL", label: "General" },
+  { code: "VERIFIED", label: "Verified" },
+  { code: "PREMIUM", label: "Premium" },
+]
+
+const getErrorMessage = (error) => {
+  const detail = error?.response?.data?.detail
+  if (!detail) return "Unexpected error"
+  if (typeof detail === "string") return detail
+  if (Array.isArray(detail)) {
+    // Pydantic v2 validation error format
+    const first = detail[0]
+    if (first?.msg) return first.msg
+    return detail.map((item) => item.msg || JSON.stringify(item)).join(", ")
+  }
+  if (detail.msg) return detail.msg
+  return typeof detail === "object" ? JSON.stringify(detail) : String(detail)
+}
 
 function AdminPanel() {
   const navigate = useNavigate()
@@ -35,6 +87,30 @@ function AdminPanel() {
   const [showAllUsers, setShowAllUsers] = useState(false)
   const [currentUserPage, setCurrentUserPage] = useState(1)
   const [currentActivityPage, setCurrentActivityPage] = useState(1)
+  const [questionList, setQuestionList] = useState([])
+  const [questionLoading, setQuestionLoading] = useState(true)
+  const [questionError, setQuestionError] = useState("")
+  const [questionFilter, setQuestionFilter] = useState("all")
+  const [showAllQuestions, setShowAllQuestions] = useState(false)
+  const [editingQuestionId, setEditingQuestionId] = useState(null)
+  const [sectionOptions, setSectionOptions] = useState([])
+  const [subsectionOptions, setSubsectionOptions] = useState([])
+  const [newSection, setNewSection] = useState("")
+  const [newSubsection, setNewSubsection] = useState("")
+  const [questionForm, setQuestionForm] = useState({
+    question_text: "",
+    answer_type: "radio",
+    score: 3,
+    display_order: 1,
+    is_required: true,
+    is_active: true,
+    user_type_code: "GENERAL",
+    section: "Awareness",
+    subsection: "Fire",
+  })
+
+  const activeSectionNames = sectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
+  const activeSubsectionNames = subsectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
 
   const getAdminToken = () => localStorage.getItem("admin_token")
 
@@ -73,6 +149,52 @@ function AdminPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAdminDashboard()
   }, [navigate])
+
+  const loadQuestions = async () => {
+    setQuestionLoading(true)
+    setQuestionError("")
+    try {
+      const adminToken = getAdminToken()
+      const response = await api.get("/admin/questions", {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })
+      const serverQuestions = (response.data?.questions || []).map((question) => ({
+        ...question,
+        id: question.id || question.question_id,
+      }))
+      if (serverQuestions.length === 0) {
+        // fall back to local cache if exists
+        const cached = JSON.parse(localStorage.getItem(LOCAL_QUESTION_CACHE_KEY) || "[]")
+        if (cached.length) {
+          setQuestionList(cached)
+          showInfo("Loaded questions from local cache (API returned none).")
+        } else {
+          setQuestionList(QUESTION_SEED)
+          showInfo("Using default 20-question model (no questions returned from API).")
+        }
+      } else {
+        setQuestionList(serverQuestions)
+        localStorage.setItem(LOCAL_QUESTION_CACHE_KEY, JSON.stringify(serverQuestions))
+      }
+    } catch (requestError) {
+      const cached = JSON.parse(localStorage.getItem(LOCAL_QUESTION_CACHE_KEY) || "[]")
+      if (cached.length) {
+        setQuestionList(cached)
+        setQuestionError("API failed. Loaded questions from local cache.")
+      } else {
+        setQuestionList(QUESTION_SEED)
+        setQuestionError(getErrorMessage(requestError) || "Falling back to default question set.")
+      }
+    } finally {
+      setQuestionLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadQuestions()
+    loadConfigOptions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem("admin_token")
@@ -250,6 +372,246 @@ function AdminPanel() {
     }
   }
 
+  const resetQuestionForm = () => {
+    setQuestionForm({
+      question_text: "",
+      answer_type: "radio",
+      score: 3,
+      display_order: (questionList?.length || 0) + 1,
+      is_required: true,
+      is_active: true,
+      user_type_code: "GENERAL",
+      section: "Awareness",
+      subsection: "Fire",
+    })
+    setEditingQuestionId(null)
+  }
+
+  const handleQuestionSubmit = async (event) => {
+    event.preventDefault()
+    const payload = {
+      ...questionForm,
+      score: Number(questionForm.score),
+      display_order: Number(questionForm.display_order),
+      subsection: questionForm.subsection,
+      section: questionForm.section,
+    }
+    if (!payload.question_text.trim()) {
+      showError("Question text is required.")
+      return
+    }
+
+    try {
+      const adminToken = getAdminToken()
+      if (editingQuestionId) {
+        const response = await api.put(`/admin/questions/${editingQuestionId}`, payload, {
+          headers: { Authorization: `Bearer ${adminToken}` },
+        })
+        const updated = response.data?.question || payload
+        setQuestionList((current) => {
+          const next = current.map((q) => (q.id === editingQuestionId ? { ...q, ...updated } : q))
+          localStorage.setItem(LOCAL_QUESTION_CACHE_KEY, JSON.stringify(next))
+          return next
+        })
+        showSuccess("Question updated.")
+      } else {
+        const response = await api.post("/admin/questions", payload, {
+          headers: { Authorization: `Bearer ${adminToken}` },
+        })
+        const created = response.data?.question || { ...payload, id: `local-${Date.now()}` }
+        setQuestionList((current) => {
+          const next = [...current, created]
+          localStorage.setItem(LOCAL_QUESTION_CACHE_KEY, JSON.stringify(next))
+          return next
+        })
+        showSuccess("Question added.")
+      }
+      resetQuestionForm()
+    } catch (requestError) {
+      const message = getErrorMessage(requestError) || "Unable to save question (UI-only fallback updated)."
+      showInfo(message)
+      // UI-only optimistic update when API fails
+      if (!editingQuestionId) {
+        setQuestionList((current) => [...current, { ...payload, id: `local-${Date.now()}` }])
+      } else {
+        setQuestionList((current) => current.map((q) => (q.id === editingQuestionId ? { ...q, ...payload } : q)))
+      }
+      resetQuestionForm()
+    }
+  }
+
+  const handleQuestionEdit = (question) => {
+    setEditingQuestionId(question.id)
+    setQuestionForm({
+      question_text: question.question_text || "",
+      answer_type: question.answer_type || "radio",
+      score: Number(question.score ?? 3),
+      display_order: Number(question.display_order ?? 1),
+      is_required: Boolean(question.is_required),
+      is_active: Boolean(question.is_active),
+      user_type_code: question.user_type_code || "GENERAL",
+      section: question.section || "Awareness",
+      subsection: question.subsection || "Fire",
+    })
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const handleQuestionToggle = async (question) => {
+    const updated = { ...question, is_active: !question.is_active }
+    const isLocalOnly = !question.id || `${question.id}`.startsWith("seed") || `${question.id}`.startsWith("local-")
+
+    // Optimistic local update first
+    setQuestionList((current) => current.map((q) => (q.id === question.id ? { ...q, ...updated } : q)))
+
+    // If this is a seed/local question and backend route doesn't exist yet, skip API noise
+    if (isLocalOnly) {
+      showSuccess(`Question ${updated.is_active ? "activated" : "deactivated"} (local seed).`)
+      setQuestionList((current) => {
+        const next = current.map((q) => (q.id === question.id ? { ...q, ...updated } : q))
+        localStorage.setItem(LOCAL_QUESTION_CACHE_KEY, JSON.stringify(next))
+        return next
+      })
+      return
+    }
+
+    try {
+      const adminToken = getAdminToken()
+      await api.patch(
+        `/admin/questions/${question.id || question.question_id}/status`,
+        { is_active: updated.is_active },
+        { headers: { Authorization: `Bearer ${adminToken}` } },
+      )
+      setQuestionList((current) => {
+        const next = current.map((q) => (q.id === question.id ? { ...q, ...updated } : q))
+        localStorage.setItem(LOCAL_QUESTION_CACHE_KEY, JSON.stringify(next))
+        return next
+      })
+      showSuccess(`Question ${updated.is_active ? "activated" : "deactivated"}.`)
+    } catch (requestError) {
+      // rollback on failure
+      setQuestionList((current) => current.map((q) => (q.id === question.id ? question : q)))
+      const message = getErrorMessage(requestError) || "Unable to update question status on server."
+      showError(message)
+    }
+  }
+
+  const loadConfigOptions = async () => {
+    const adminToken = getAdminToken()
+    try {
+      const [sectionsRes, subsectionsRes] = await Promise.all([
+        api.get("/admin/config/sections", { headers: { Authorization: `Bearer ${adminToken}` } }),
+        api.get("/admin/config/subsections", { headers: { Authorization: `Bearer ${adminToken}` } }),
+      ])
+      const sections = sectionsRes.data?.sections || []
+      const subsections = subsectionsRes.data?.subsections || []
+      setSectionOptions(sections)
+      setSubsectionOptions(subsections)
+    } catch (error) {
+      console.warn("Config load failed, using defaults", error)
+    }
+  }
+
+  const handleAddSection = async () => {
+    if (!newSection.trim()) return
+    const adminToken = getAdminToken()
+    try {
+      const res = await api.post(
+        "/admin/config/sections",
+        { name: newSection.trim(), display_order: sectionOptions.length + 1, is_active: true },
+        { headers: { Authorization: `Bearer ${adminToken}` } },
+      )
+      const created = res.data?.section
+      setSectionOptions((current) => [...current, created])
+      setNewSection("")
+      showSuccess("Section added.")
+    } catch (error) {
+      showError(getErrorMessage(error))
+    }
+  }
+
+  const handleAddSubsection = async () => {
+    if (!newSubsection.trim()) return
+    const adminToken = getAdminToken()
+    try {
+      const res = await api.post(
+        "/admin/config/subsections",
+        { name: newSubsection.trim(), display_order: subsectionOptions.length + 1, is_active: true },
+        { headers: { Authorization: `Bearer ${adminToken}` } },
+      )
+      const created = res.data?.subsection
+      setSubsectionOptions((current) => [...current, created])
+      setNewSubsection("")
+      showSuccess("Subsection added.")
+    } catch (error) {
+      showError(getErrorMessage(error))
+    }
+  }
+
+  const handleDeleteSection = async (sectionId) => {
+    const adminToken = getAdminToken()
+    try {
+      await api.delete(`/admin/config/sections/${sectionId}`, { headers: { Authorization: `Bearer ${adminToken}` } })
+      setSectionOptions((current) => current.filter((s) => s.id !== sectionId))
+      showSuccess("Section removed.")
+    } catch (error) {
+      showError(getErrorMessage(error))
+    }
+  }
+
+  const handleDeleteSubsection = async (subId) => {
+    const adminToken = getAdminToken()
+    try {
+      await api.delete(`/admin/config/subsections/${subId}`, { headers: { Authorization: `Bearer ${adminToken}` } })
+      setSubsectionOptions((current) => current.filter((s) => s.id !== subId))
+      showSuccess("Subsection removed.")
+    } catch (error) {
+      showError(getErrorMessage(error))
+    }
+  }
+
+  const handleQuestionDelete = async (question) => {
+    const confirmed = window.confirm("Delete this question permanently?")
+    if (!confirmed) return
+
+    const isLocalOnly = !question.id || `${question.id}`.startsWith("seed") || `${question.id}`.startsWith("local-")
+
+    // Optimistic remove
+    setQuestionList((current) => {
+      const next = current.filter((q) => (q.id || q.question_id) !== (question.id || question.question_id))
+      localStorage.setItem(LOCAL_QUESTION_CACHE_KEY, JSON.stringify(next))
+      return next
+    })
+
+    if (isLocalOnly) return
+
+    try {
+      const adminToken = getAdminToken()
+      await api.delete(`/admin/questions/${question.id || question.question_id}`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })
+      showSuccess("Question deleted.")
+    } catch (requestError) {
+      const message = getErrorMessage(requestError) || "Unable to delete question on server."
+      showError(message)
+      // rollback if server failed
+      setQuestionList((current) => {
+        const next = [...current, question]
+        localStorage.setItem(LOCAL_QUESTION_CACHE_KEY, JSON.stringify(next))
+        return next
+      })
+    }
+  }
+
+  const filteredQuestions = questionList
+    .map((q) => ({
+      ...q,
+      score: Number(q.score ?? 0),
+      display_order: Number(q.display_order ?? 0),
+    }))
+    .filter((q) => (questionFilter === "all" ? true : q.user_type_code === questionFilter))
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+  const visibleQuestions = showAllQuestions ? filteredQuestions : filteredQuestions.slice(0, 4)
+
   const stats = data?.stats || {}
   const users = data?.users ?? []
   const recentUsers = data?.recent_users || []
@@ -294,6 +656,10 @@ function AdminPanel() {
   useEffect(() => {
     setCurrentUserPage(1)
   }, [searchTerm, statusFilter, showAllUsers])
+
+  useEffect(() => {
+    setShowAllQuestions(false)
+  }, [questionFilter])
 
   if (loading) {
     return (
@@ -467,6 +833,242 @@ function AdminPanel() {
                   </li>
                 ))}
             </ul>
+          </div>
+        </div>
+
+        <div className="admin-panel-card admin-questions-card">
+          <div className="admin-table-header">
+            <div>
+              <h3>Question Bank (Admin only)</h3>
+              <p className="admin-helper-text">
+                20-question model preloaded from Vedastro doc. Save calls /admin/questions; falls back to local seed when API is unavailable.
+              </p>
+            </div>
+            <div className="admin-question-toolbar">
+              <select value={questionFilter} onChange={(event) => setQuestionFilter(event.target.value)} className="admin-filter">
+                <option value="all">All user types</option>
+                {USER_TYPE_OPTIONS.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span className="admin-count-pill">{filteredQuestions.length} total</span>
+              <button className="admin-action-btn ghost" onClick={resetQuestionForm}>
+                New Question
+              </button>
+            </div>
+          </div>
+
+          <form className="admin-question-form" onSubmit={handleQuestionSubmit}>
+            <div className="admin-question-grid">
+              <label>
+                <span>Question Text</span>
+                <textarea
+                  required
+                  value={questionForm.question_text}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, question_text: event.target.value }))}
+                  placeholder="Enter the question exactly as you want users to see it"
+                />
+              </label>
+              <label>
+                <span>Section / Bucket</span>
+                <select
+                  value={questionForm.section}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, section: event.target.value }))}
+                >
+                  {activeSectionNames.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Subsection (Elements)</span>
+                <select
+                  value={questionForm.subsection}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, subsection: event.target.value }))}
+                >
+                  {activeSubsectionNames.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>User Type</span>
+                <select
+                  value={questionForm.user_type_code}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, user_type_code: event.target.value }))}
+                >
+                  {USER_TYPE_OPTIONS.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Answer Type</span>
+                <select
+                  value={questionForm.answer_type}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, answer_type: event.target.value }))}
+                >
+                  <option value="radio">Likert (1-5)</option>
+                  <option value="slider">Slider</option>
+                  <option value="text">Short Text</option>
+                  <option value="checkbox">Checkbox</option>
+                </select>
+              </label>
+              <label>
+                <span>Score (default)</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={questionForm.score}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, score: Number(event.target.value) }))}
+                />
+              </label>
+              <label>
+                <span>Display Order</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={questionForm.display_order}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, display_order: Number(event.target.value) }))}
+                />
+              </label>
+              <label className="admin-toggle-chip">
+                <input
+                  type="checkbox"
+                  checked={questionForm.is_required}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, is_required: event.target.checked }))}
+                />
+                <span>Required</span>
+              </label>
+              <label className="admin-toggle-chip">
+                <input
+                  type="checkbox"
+                  checked={questionForm.is_active}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, is_active: event.target.checked }))}
+                />
+                <span>Active</span>
+              </label>
+            </div>
+            <div className="admin-question-actions center">
+              <button type="submit" className="admin-primary-btn">
+                {editingQuestionId ? "Update Question" : "Add Question"}
+              </button>
+              {editingQuestionId && (
+                <button type="button" className="admin-action-btn ghost" onClick={resetQuestionForm}>
+                  Cancel Edit
+                </button>
+              )}
+            </div>
+            {questionError && <p className="error-message compact">{questionError}</p>}
+          </form>
+
+          <div className="admin-question-list">
+            {questionLoading ? (
+              <div className="skeleton-card">
+                <div className="skeleton-line" />
+                <div className="skeleton-line" />
+                <div className="skeleton-line short" />
+              </div>
+            ) : filteredQuestions.length === 0 ? (
+              <div className="empty-state-card compact">
+                <p>No questions for this user type yet.</p>
+              </div>
+            ) : (
+              visibleQuestions.map((question) => (
+                <div key={question.id || question.question_id} className={`admin-question-item ${!question.is_active ? "inactive" : ""}`}>
+                  <div>
+                    <p className="admin-question-text">{question.question_text}</p>
+                    <div className="admin-question-meta">
+                      <span>{question.section || "Unsectioned"}</span>
+                      <span>Type: {question.answer_type}</span>
+                      <span>Order: {question.display_order}</span>
+                      <span>User: {question.user_type_code || "GENERAL"}</span>
+                      <span>Subsection: {question.subsection || "-"}</span>
+                      <span>{question.is_required ? "Required" : "Optional"}</span>
+                    </div>
+                  </div>
+                  <div className="admin-question-actions">
+                    <button className="admin-action-btn" onClick={() => handleQuestionEdit(question)}>
+                      Edit
+                    </button>
+                    <button className="admin-action-btn warn" onClick={() => handleQuestionToggle(question)}>
+                      {question.is_active ? "Deactivate" : "Activate"}
+                    </button>
+                    <button className="admin-action-btn danger" onClick={() => handleQuestionDelete(question)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {filteredQuestions.length > 4 && (
+            <div className="admin-log-actions admin-log-actions-split">
+              <button className="admin-action-btn" onClick={() => setShowAllQuestions((current) => !current)}>
+                {showAllQuestions ? "Show Top 4 Questions" : `Show All Questions (${filteredQuestions.length})`}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="admin-panel-card">
+          <div className="admin-table-header">
+            <h3>Config: Sections & Subsections</h3>
+          </div>
+          <div className="admin-config-grid">
+            <div className="admin-config-block">
+              <h4>Sections</h4>
+              <ul className="admin-config-list">
+                {sectionOptions.map((s) => (
+                  <li key={s.id}>
+                    {s.name} {s.is_active ? "" : "(inactive)"}
+                    <button className="admin-inline-remove" onClick={() => handleDeleteSection(s.id)}>✕</button>
+                  </li>
+                ))}
+              </ul>
+              <div className="admin-config-add">
+                <input
+                  className="admin-search"
+                  placeholder="Add new section"
+                  value={newSection}
+                  onChange={(e) => setNewSection(e.target.value)}
+                />
+                <button className="auth-button" onClick={handleAddSection}>
+                  Add
+                </button>
+              </div>
+            </div>
+            <div className="admin-config-block">
+              <h4>Subsections</h4>
+              <ul className="admin-config-list">
+                {subsectionOptions.map((s) => (
+                  <li key={s.id}>
+                    {s.name} {s.is_active ? "" : "(inactive)"}
+                    <button className="admin-inline-remove" onClick={() => handleDeleteSubsection(s.id)}>✕</button>
+                  </li>
+                ))}
+              </ul>
+              <div className="admin-config-add">
+                <input
+                  className="admin-search"
+                  placeholder="Add new subsection"
+                  value={newSubsection}
+                  onChange={(e) => setNewSubsection(e.target.value)}
+                />
+                <button className="auth-button" onClick={handleAddSubsection}>
+                  Add
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

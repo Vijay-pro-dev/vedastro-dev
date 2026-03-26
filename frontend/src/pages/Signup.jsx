@@ -109,11 +109,29 @@ function Signup() {
         refresh_token: response.data.refresh_token,
         user: me.data,
       })
+
+      // If a guest filled /form earlier, save it to the new profile now
+      try {
+        const draftRaw = localStorage.getItem("guest_profile_draft")
+        if (draftRaw) {
+          const draft = JSON.parse(draftRaw) || {}
+          const merged =
+            draft.formData || draft.careerData ? { ...(draft.formData || {}), ...(draft.careerData || {}) } : draft
+          await api.put("/profile", merged)
+        }
+      } catch (syncErr) {
+        console.warn("Guest draft sync skipped during signup:", syncErr)
+      }
       if (response.data.verification_token) {
         showInfo(`Email verification token: ${response.data.verification_token}`)
       }
       showSuccess("Account created successfully.")
-      navigate("/form", { replace: true })
+      // Reset any guest draft/questionnaire data so signed-up users start clean
+      localStorage.removeItem("guest_questionnaire_answers")
+      localStorage.removeItem("guest_questionnaire_questions")
+      localStorage.removeItem("guest_profile_draft")
+      localStorage.removeItem("questionnaire_completed")
+      navigate("/dashboard", { replace: true })
     } catch (err) {
       const apiDetail =
         err.response?.data?.detail ||

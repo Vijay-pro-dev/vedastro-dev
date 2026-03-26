@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useRef, useState } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import {
   Area,
   AreaChart,
@@ -22,14 +22,121 @@ import { api } from "../lib/api"
 
 function Dashboard() {
   const navigate = useNavigate()
-  const { updateUser, t } = useUser()
+  const location = useLocation()
+  const { user, updateUser, t } = useUser()
   const { showError } = useToast()
   const [data, setData] = useState(null)
   const [activeTab, setActiveTab] = useState("overview")
+  const [authPrompt, setAuthPrompt] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showAccuracyModal, setShowAccuracyModal] = useState(false)
   const [loading, setLoading] = useState(true)
+  const performanceRef = useRef(null)
+
+  // If user already answered questionnaire, always use new dashboard
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (!token) return
+    let answered = false
+    try {
+      const parsed = JSON.parse(localStorage.getItem("guest_questionnaire_answers") || "{}")
+      answered = parsed && Object.keys(parsed).length > 0
+    } catch {
+      answered = false
+    }
+    const completedFlag = localStorage.getItem("questionnaire_completed") === "true"
+    if (completedFlag && answered) {
+      navigate("/newdashboard", { replace: true })
+    }
+  }, [navigate])
+
+  const computeGuestPreview = (draft) => {
+    const requiredFields = [
+      "name",
+      "phone",
+      "address",
+      "dob",
+      "birth_place",
+      "education",
+      "interests",
+      "goals",
+      "current_role",
+    ]
+    const filled = requiredFields.filter((field) => {
+      const val = draft?.[field]
+      return val !== undefined && val !== null && String(val).trim() !== ""
+    }).length
+    const completeness = Math.max(20, Math.round((filled / requiredFields.length) * 100))
+
+    const years = Number(draft?.years_experience || 0)
+    const timeAlignment = Math.min(100, Math.round(completeness * 0.6 + Math.min(years, 15) * 2.5))
+
+    const actionIntegrity =
+      (draft?.goals ? 20 : 0) +
+      (draft?.interests ? 15 : 0) +
+      (draft?.current_role ? 15 : 0) +
+      (draft?.education ? 10 : 0) +
+      (draft?.role_match === "high" ? 20 : draft?.role_match === "medium" ? 10 : 5) +
+      (draft?.goal_clarity === "high" ? 20 : draft?.goal_clarity === "medium" ? 12 : 6)
+    const actionScore = Math.min(100, Math.max(30, Math.round(actionIntegrity)))
+
+    const awarenessScore = Math.min(100, Math.max(30, completeness))
+    const careerAlignmentScore = Math.round((awarenessScore + timeAlignment + actionScore) / 3)
+
+    return {
+      career_alignment_score: careerAlignmentScore,
+      awareness_score: awarenessScore,
+      time_alignment_score: timeAlignment,
+      action_integrity_score: actionScore,
+    }
+  }
 
   useEffect(() => {
     const loadDashboard = async () => {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        // guest view: use draft data or defaults
+        const draft = location.state?.guestProfile || JSON.parse(localStorage.getItem("guest_profile_draft") || "{}")
+        const flatDraft =
+          draft && (draft.formData || draft.careerData)
+            ? { ...(draft.formData || {}), ...(draft.careerData || {}) }
+            : draft
+        const guestScores = computeGuestPreview(flatDraft)
+        const today = new Date()
+        const fmt = (d) => d.toISOString().slice(0, 10)
+        const oppStart = fmt(today)
+        const oppEnd = fmt(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000))
+        const trendPoints = [
+          { month: "T-2", score: Math.max(guestScores.career_alignment_score - 8, 25) },
+          { month: "T-1", score: Math.max(guestScores.career_alignment_score - 4, 30) },
+          { month: "Now", score: guestScores.career_alignment_score },
+        ]
+        const guidance = {
+          recommendations: [
+            "Save your profile to keep this progress.",
+            guestScores.awareness_score < 70 ? "Clarify your goals in the profile to boost Awareness." : "Great awareness — keep tracking weekly.",
+            guestScores.action_integrity_score < 70 ? "Add 2 concrete weekly actions to raise Action score." : "Maintain your action routine; log wins in Dashboard.",
+          ],
+          summary: "Create an account to unlock AI-personalized guidance and save your answers.",
+        }
+        const guestData = {
+          ...guestScores,
+          current_career_phase: "Guest Preview",
+          opportunity_window: {
+            start_date: oppStart,
+            end_date: oppEnd,
+            type: "preview",
+            recommended_action: "Create an account to personalize your window",
+          },
+          trend_data: trendPoints,
+          guidance_recommendations: guidance,
+          user_profile: flatDraft,
+          profile_completed: false,
+        }
+        setData(guestData)
+        setLoading(false)
+        return
+      }
       try {
         const response = await api.get("/career/dashboard")
         setData(response.data)
@@ -47,6 +154,26 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     loadDashboard()
   }, [])
+
+  // Show modal when performance summary scrolls into view (trends tab)
+  useEffect(() => {
+    if (activeTab !== "trends") return
+    const node = performanceRef.current
+    if (!node || showAccuracyModal) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setShowAccuracyModal(true)
+            observer.disconnect()
+          }
+        })
+      },
+      { threshold: 0.2, rootMargin: "0px 0px -30% 0px" },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [activeTab, showAccuracyModal])
 
   if (loading) {
     return (
@@ -92,20 +219,26 @@ function Dashboard() {
         <h1>{t.dashboard}</h1>
         <div className="tab-buttons">
           <button className={`tab-btn ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>{t.overview}</button>
-          <button className={`tab-btn ${activeTab === "insights" ? "active" : ""}`} onClick={() => setActiveTab("insights")}>{t.insights}</button>
-          <button className={`tab-btn ${activeTab === "trends" ? "active" : ""}`} onClick={() => setActiveTab("trends")}>{t.trends}</button>
-        </div>
-      </div>
-
-      {!data.profile_completed && (
-        <div className="ultra-card full-width">
-          <h3>{t.profileIncomplete}</h3>
-          <p>{t.finishProfile}</p>
-          <button className="btn primary" onClick={() => navigate("/form")}>
-            {t.completeProfile}
+          <button
+            className={`tab-btn ${activeTab === "insights" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("insights")
+              if (!user) setShowAuthModal(true)
+            }}
+          >
+            {t.insights}
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "trends" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("trends")
+              if (!user) setShowAuthModal(true)
+            }}
+          >
+            {t.trends}
           </button>
         </div>
-      )}
+      </div>
 
       {activeTab === "overview" && (
         <div className="ultra-grid">
@@ -179,8 +312,39 @@ function Dashboard() {
         </div>
       )}
 
+      {showAuthModal && (
+        <div className="lock-overlay auth-modal" onClick={() => setShowAuthModal(false)}>
+          <div className="lock-dialog" onClick={(e) => e.stopPropagation()}>
+            <button className="ghost-close icon" onClick={() => setShowAuthModal(false)} aria-label="Close dialog">
+              ×
+            </button>
+            <h3>Sign up to unlock Insights & Trends</h3>
+            <p>We need an account to save your progress and show full analytics.</p>
+            <div className="lock-actions">
+              <button className="btn primary" onClick={() => navigate("/signup")}>Sign up</button>
+              <button className="btn secondary" onClick={() => navigate("/login")}>Login</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAccuracyModal && (
+        <div className="lock-overlay auth-modal" onClick={() => setShowAccuracyModal(false)}>
+          <div className="lock-dialog" onClick={(e) => e.stopPropagation()}>
+            <button className="ghost-close icon" onClick={() => setShowAccuracyModal(false)} aria-label="Close dialog">
+              ×
+            </button>
+            <h3>For more accurate result</h3>
+            <p>Click below to answer a few more questions and sharpen your insights.</p>
+            <div className="lock-actions">
+              <button className="btn primary" onClick={() => navigate("/questionnaire")}>Click on this</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "insights" && (
-        <div className="insights-section">
+        <div className={`insights-section ${!user ? "locked-blur" : ""}`}>
           <InsightCards
             careerPhase={data.current_career_phase}
             alignmentScore={data.career_alignment_score}
@@ -188,7 +352,7 @@ function Dashboard() {
           />
 
           <div className="ultra-grid" style={{ marginTop: "30px" }}>
-            <div className="ultra-card">
+            <div className="ultra-card" ref={performanceRef}>
               <h3>Profile Signals</h3>
               <ul className="focus-list">
                 <li>Current role: {data.user_profile?.current_role || "Not added yet"}</li>
@@ -216,7 +380,7 @@ function Dashboard() {
       )}
 
       {activeTab === "trends" && (
-        <div className="trends-section">
+        <div className={`trends-section ${!user ? "locked-blur" : ""}`}>
           <div className="ultra-grid">
             <div className="ultra-card full-width">
               <h3>Career Score Evolution</h3>
@@ -264,7 +428,7 @@ function Dashboard() {
               </div>
             </div>
 
-            <div className="ultra-card">
+            <div className="ultra-card" ref={performanceRef}>
               <h3>Performance Summary</h3>
               <div className="performance-item">
                 <label>Awareness Score</label>
@@ -280,6 +444,11 @@ function Dashboard() {
                 <label>Action Integrity</label>
                 <div className="progress-bar"><div className="progress" style={{ width: `${data.action_integrity_score}%` }} /></div>
                 <span>{data.action_integrity_score}%</span>
+              </div>
+              <div style={{ marginTop: "16px", textAlign: "right" }}>
+                <button className="btn secondary" onClick={() => setShowAccuracyModal(true)}>
+                  For more accurate result
+                </button>
               </div>
             </div>
           </div>

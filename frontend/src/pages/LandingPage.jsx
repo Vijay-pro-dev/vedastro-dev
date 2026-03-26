@@ -1,6 +1,16 @@
-import { useEffect, useRef, useState } from "react"
+﻿import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { FaChartLine, FaClock, FaChevronDown, FaLightbulb, FaSignOutAlt, FaUser } from "react-icons/fa"
+import {
+  FaChartLine,
+  FaClock,
+  FaChevronDown,
+  FaEye,
+  FaEyeSlash,
+  FaLightbulb,
+  FaSignOutAlt,
+  FaTimes,
+  FaUser,
+} from "react-icons/fa"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
 import { getTranslations } from "../lib/i18n"
@@ -14,6 +24,7 @@ function LandingPage() {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
   const [showLoginResetFields, setShowLoginResetFields] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [landingLanguage, setLandingLanguage] = useState(() => localStorage.getItem("landing_language") || "english")
   const [formState, setFormState] = useState({
     name: "",
@@ -29,13 +40,21 @@ function LandingPage() {
   const activeLanguage = user?.language || landingLanguage
   const pageT = getTranslations(activeLanguage)
   const signupT = pageT
+  const hasQuestionnaireAnswers = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("guest_questionnaire_answers") || "{}")
+      return stored && Object.keys(stored).length > 0
+    } catch {
+      return false
+    }
+  }
 
   const languageOptions = [
     { value: "english", label: "English (UK)" },
-    { value: "hindi", label: "हिन्दी" },
-    { value: "french", label: "Français" },
+    { value: "hindi", label: "à¤¹à¤¿à¤¨à¥à¤¦à¥€" },
+    { value: "french", label: "FranÃ§ais" },
     { value: "german", label: "Deutsch" },
-    { value: "arabic", label: "العربية" },
+    { value: "arabic", label: "Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©" },
   ]
 
   const activeLanguageLabel =
@@ -249,7 +268,9 @@ function LandingPage() {
                   <button
                     type="button"
                     className="dropdown-action"
-                    onClick={() => navigate(isAdmin ? "/admin-panel" : "/dashboard")}
+                    onClick={() => {
+                      navigate(isAdmin ? "/admin-panel" : "/dashboard")
+                    }}
                   >
                     {isAdmin ? "Admin Panel" : pageT.dashboard}
                   </button>
@@ -348,6 +369,17 @@ function LandingPage() {
           resetAuthForm()
         }}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="auth-close"
+              aria-label="Close"
+              onClick={() => {
+                setShowLoginModal(false)
+                resetAuthForm()
+              }}
+            >
+              <FaTimes aria-hidden />
+            </button>
             <h2>{pageT.login}</h2>
             <p>{pageT.loginSub}</p>
             <form
@@ -365,14 +397,22 @@ function LandingPage() {
                   required
                 />
               </div>
-              <div className="modal-input-group">
+              <div className="modal-input-group password-field">
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Password"
                   value={formState.password}
                   onChange={(event) => setFormState((current) => ({ ...current, password: event.target.value }))}
                   required
                 />
+                <button
+                  type="button"
+                  className="modal-password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
               </div>
               {error && <p className="error-msg">{error}</p>}
               <button type="button" className="modal-link-btn" onClick={handleForgotPassword} disabled={loading}>
@@ -415,7 +455,7 @@ function LandingPage() {
                 className="btn primary"
                 onClick={() => {
                   setShowLanguageDropdown(false)
-                  setShowSignupModal(true)
+                  navigate("/form")
                 }}
               >
                 {pageT.startFreeAnalysis}
@@ -436,21 +476,12 @@ function LandingPage() {
             <div className="buttons">
               <button
                 className="btn primary"
-                onClick={() =>
-                  navigate(
-                    primaryAction === "admin-panel"
-                      ? "/admin-panel"
-                      : primaryAction === "dashboard"
-                        ? "/dashboard"
-                        : "/form",
-                  )
-                }
+                onClick={() => {
+                  setShowLanguageDropdown(false)
+                  navigate(isAdmin ? "/admin-panel" : "/dashboard")
+                }}
               >
-                {primaryAction === "admin-panel"
-                  ? "Admin Panel"
-                  : primaryAction === "dashboard"
-                    ? pageT.dashboard
-                    : pageT.completeProfile}
+                {isAdmin ? "Admin Panel" : pageT.dashboard}
               </button>
               <button className="btn secondary" onClick={() => navigate("/profile")}>
                 {pageT.profile}
@@ -485,3 +516,4 @@ function LandingPage() {
 }
 
 export default LandingPage
+

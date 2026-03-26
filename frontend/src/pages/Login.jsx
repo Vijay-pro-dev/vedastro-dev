@@ -57,6 +57,22 @@ function Login() {
         user: me.data,
       })
 
+      // If the user filled /form as a guest, sync that draft to their profile now
+      try {
+        const draftRaw = localStorage.getItem("guest_profile_draft")
+        if (draftRaw) {
+          const draft = JSON.parse(draftRaw) || {}
+          const merged =
+            draft.formData || draft.careerData ? { ...(draft.formData || {}), ...(draft.careerData || {}) } : draft
+          await api.put("/profile", merged)
+          localStorage.removeItem("guest_profile_draft")
+        }
+      } catch (syncErr) {
+        console.warn("Guest draft sync skipped:", syncErr)
+      }
+      // Clear any questionnaire completion flag when logging in fresh
+      localStorage.removeItem("questionnaire_completed")
+
       if (rememberMe) {
         localStorage.setItem("rememberedEmail", email)
       } else {
@@ -148,6 +164,14 @@ function Login() {
     <div className="auth-page login-page">
       <div className="auth-container auth-container-single">
         <div className="auth-card">
+          <button
+            type="button"
+            className="auth-close"
+            aria-label="Close"
+            onClick={() => navigate(-1)}
+          >
+            ×
+          </button>
           <div className="auth-header">
             <h1>{t.welcomeBack}</h1>
             <p>{t.loginSub}</p>

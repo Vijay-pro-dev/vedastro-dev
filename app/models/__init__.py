@@ -16,3 +16,10 @@ from app.models.user import (
     UserInfo,
 )
 
+from app.models.question import (
+    Question,
+    QuestionUserTypeMap,
+    UserType,
+    Section,
+    Subsection,
+)
