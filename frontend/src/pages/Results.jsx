@@ -37,7 +37,7 @@ function Results() {
         const [respAlign, respResp] = await Promise.all([api.get("/career/alignment/latest"), api.get("/career/responses/latest")])
 
         const alignRow = respAlign.data?.alignment
-        if (alignRow) setAlignment(alignRow)
+        if (alignRow && alignRow.overall_score != null) setAlignment(alignRow)
 
         const responses = respResp.data?.responses || []
         if (!responses.length) return
