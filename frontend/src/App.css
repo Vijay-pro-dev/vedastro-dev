@@ -4491,7 +4491,7 @@ background-clip: text;
   width: fit-content;
   align-self: flex-start;
   border-radius: 10px;
-  border: 1px solid rgba(0, 245, 255, 0.7);
+  border: none;
   background: rgba(0, 245, 255, 0.2);
   color: #e8f5ff;
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
@@ -4501,7 +4501,6 @@ background-clip: text;
 }
 .back-btn:hover {
   background: rgba(0, 245, 255, 0.28);
-  border-color: rgba(0, 245, 255, 0.85);
 }
 .mini-legend {
   display: flex;
