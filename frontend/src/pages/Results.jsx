@@ -255,6 +255,9 @@ function Results() {
 
   return (
     <div className="results-shell">
+      <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+        ← Back
+      </button>
       <div className="cosmic-top">
         <div className="cosmic-left">
           <p className="eyebrow">Build Your <span className="accent">Cosmic Profile</span></p>
@@ -305,21 +308,48 @@ function Results() {
             </div>
             <span className="pill dark">20 Questions</span>
           </div>
-          <div className="pill-stack">
-            <div className="metric">
-              <span>Awareness (Clarity)</span>
-              <div className="meter"><div style={{ width: `${scores.awarenessScore}%` }} /></div>
-              <strong>{scores.awarenessScore}/100</strong>
+          <div className="mini-metric-grid">
+            <div className="mini-metric-card">
+              <div className="mini-metric-header">
+                <span>Awareness (Clarity)</span>
+                <strong>{scores.awarenessScore}/100</strong>
+              </div>
+              <div
+                className="mini-donut"
+                style={{
+                  background: `conic-gradient(#22d3ee ${scores.awarenessScore * 3.6}deg, rgba(255,255,255,0.08) 0deg)`
+                }}
+              >
+                <div className="mini-donut-hole" style={{ color: "#22d3ee" }}>{scores.awarenessScore}</div>
+              </div>
             </div>
-            <div className="metric">
-              <span>Time (Opportunity)</span>
-              <div className="meter"><div style={{ width: `${scores.timeAlignment}%` }} /></div>
-              <strong>{scores.timeAlignment}/100</strong>
+            <div className="mini-metric-card">
+              <div className="mini-metric-header">
+                <span>Time (Opportunity)</span>
+                <strong>{scores.timeAlignment}/100</strong>
+              </div>
+              <div
+                className="mini-donut"
+                style={{
+                  background: `conic-gradient(#f59e0b ${scores.timeAlignment * 3.6}deg, rgba(255,255,255,0.08) 0deg)`
+                }}
+              >
+                <div className="mini-donut-hole" style={{ color: "#f59e0b" }}>{scores.timeAlignment}</div>
+              </div>
             </div>
-            <div className="metric">
-              <span>Action (Execution)</span>
-              <div className="meter"><div style={{ width: `${scores.actionScore}%` }} /></div>
-              <strong>{scores.actionScore}/100</strong>
+            <div className="mini-metric-card">
+              <div className="mini-metric-header">
+                <span>Action (Execution)</span>
+                <strong>{scores.actionScore}/100</strong>
+              </div>
+              <div
+                className="mini-donut"
+                style={{
+                  background: `conic-gradient(#a855f7 ${scores.actionScore * 3.6}deg, rgba(255,255,255,0.08) 0deg)`
+                }}
+              >
+                <div className="mini-donut-hole" style={{ color: "#a855f7" }}>{scores.actionScore}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -332,8 +362,10 @@ function Results() {
             <div className="live-donut">
             <div className="donut-ring" style={elementDonutStyle}>
               <div className="donut-hole">
-                <span className="donut-number">{scores.careerAlignmentScore}</span>
-                <small>Score</small>
+                <div className="donut-inner-glow">
+                  <span className="donut-label">Elements</span>
+                  <span className="donut-number small">5</span>
+                </div>
               </div>
             </div>
             <ul className="element-list">

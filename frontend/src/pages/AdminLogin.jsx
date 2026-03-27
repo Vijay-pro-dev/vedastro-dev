@@ -37,6 +37,9 @@ function AdminLogin() {
     <div className="auth-page">
       <div className="auth-container auth-container-single">
         <div className="auth-card">
+          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+            ← Back
+          </button>
           <div className="auth-header">
             <h1>Admin Login</h1>
             <p>Login with admin credentials to open the project admin panel.</p>

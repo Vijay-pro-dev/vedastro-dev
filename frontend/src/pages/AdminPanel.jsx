@@ -95,6 +95,7 @@ function AdminPanel() {
   const [editingQuestionId, setEditingQuestionId] = useState(null)
   const [sectionOptions, setSectionOptions] = useState([])
   const [subsectionOptions, setSubsectionOptions] = useState([])
+  const [showMenu, setShowMenu] = useState(false)
   const [newSection, setNewSection] = useState("")
   const [newSubsection, setNewSubsection] = useState("")
   const [questionForm, setQuestionForm] = useState({
@@ -661,10 +662,18 @@ function AdminPanel() {
     setShowAllQuestions(false)
   }, [questionFilter])
 
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id)
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   if (loading) {
     return (
       <div className="admin-panel-page">
         <div className="admin-panel-shell">
+          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+            ← Back
+          </button>
           <div className="admin-stats-grid">
             {[1, 2, 3, 4].map((item) => (
               <div key={item} className="skeleton-card">
@@ -697,6 +706,28 @@ function AdminPanel() {
   return (
     <div className="admin-panel-page">
       <div className="admin-panel-shell">
+        <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+          ← Back
+        </button>
+        <button className="admin-menu-toggle" aria-expanded={showMenu} onClick={() => setShowMenu((v) => !v)}>
+          {showMenu ? "✕ Close Menu" : "☰ Menu"}
+        </button>
+        <nav className={`admin-sidebar ${showMenu ? "open" : ""}`}>
+          <span className="admin-sidebar-title">Menu</span>
+          <button className="auth-button admin-menu-btn" onClick={() => scrollToSection("section-users")}>
+            Registered Users
+          </button>
+          <button className="auth-button admin-menu-btn" onClick={() => scrollToSection("section-logs")}>
+            Recent Activity Logs
+          </button>
+          <button className="auth-button admin-menu-btn" onClick={() => scrollToSection("section-config")}>
+            Config: Sections &amp; Subsections
+          </button>
+          <button className="auth-button admin-menu-btn" onClick={() => scrollToSection("section-questions")}>
+            Question Bank
+          </button>
+        </nav>
+        <div className="admin-main">
         <div className="admin-panel-header">
           <div>
             <h1>Admin Panel</h1>
@@ -712,7 +743,7 @@ function AdminPanel() {
           </div>
         </div>
 
-        <div className="admin-stats-grid">
+        <div className="admin-stats-grid" id="section-users">
           <div className="admin-stat-card">
             <span>Total Users</span>
             <strong>{stats.total_users || 0}</strong>
@@ -836,7 +867,7 @@ function AdminPanel() {
           </div>
         </div>
 
-        <div className="admin-panel-card admin-questions-card">
+        <div className="admin-panel-card admin-questions-card" id="section-questions">
           <div className="admin-table-header">
             <div>
               <h3>Question Bank (Admin only)</h3>
@@ -941,6 +972,8 @@ function AdminPanel() {
                   onChange={(event) => setQuestionForm((current) => ({ ...current, display_order: Number(event.target.value) }))}
                 />
               </label>
+            </div>
+            <div className="admin-toggle-row">
               <label className="admin-toggle-chip">
                 <input
                   type="checkbox"
@@ -1020,7 +1053,7 @@ function AdminPanel() {
           )}
         </div>
 
-        <div className="admin-panel-card">
+        <div className="admin-panel-card" id="section-config">
           <div className="admin-table-header">
             <h3>Config: Sections & Subsections</h3>
           </div>
@@ -1093,7 +1126,7 @@ function AdminPanel() {
           </div>
         </div>
 
-        <div className="admin-panel-card">
+        <div className="admin-panel-card" id="section-logs">
           <div className="admin-table-header">
             <h3>Recent Activity Logs</h3>
             <span>{recentActivityLogs.length} events</span>
@@ -1120,7 +1153,7 @@ function AdminPanel() {
           </div>
         </div>
 
-        <div className="admin-panel-card">
+        <div className="admin-panel-card" id="section-users-list">
           <div className="admin-table-header">
             <h3>Registered Users</h3>
             <span>{showAllUsers ? filteredUsers.length : Math.min(filteredUsers.length, 5)} records</span>
@@ -1352,6 +1385,7 @@ function AdminPanel() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

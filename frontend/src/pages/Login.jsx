@@ -164,6 +164,9 @@ function Login() {
     <div className="auth-page login-page">
       <div className="auth-container auth-container-single">
         <div className="auth-card">
+          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+            ← Back
+          </button>
           <button
             type="button"
             className="auth-close"

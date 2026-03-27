@@ -168,6 +168,9 @@ function ProfilePage() {
 
   return (
     <div className="profile-page-shell">
+      <button type="button" className="back-btn" onClick={() => window.history.back()}>
+        ← Back
+      </button>
       <div className="profile-page-header">
         <div>
           <h1>{t.myProfile}</h1>

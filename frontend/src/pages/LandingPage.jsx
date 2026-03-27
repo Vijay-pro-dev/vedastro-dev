@@ -303,10 +303,7 @@ function LandingPage() {
       </nav>
 
       {showSignupModal && !user && (
-        <div className="modal-overlay" onClick={() => {
-          setShowSignupModal(false)
-          resetAuthForm()
-        }}>
+        <div className="modal-overlay">
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
             <h2>{signupT.createAccount}</h2>
             <p>{signupT.createAccountSub}</p>
@@ -364,10 +361,7 @@ function LandingPage() {
       )}
 
       {showLoginModal && !user && (
-        <div className="modal-overlay" onClick={() => {
-          setShowLoginModal(false)
-          resetAuthForm()
-        }}>
+        <div className="modal-overlay">
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
             <button
               type="button"
@@ -459,15 +453,6 @@ function LandingPage() {
                 }}
               >
                 {pageT.startFreeAnalysis}
-              </button>
-              <button
-                className="btn secondary"
-                onClick={() => {
-                  setShowLanguageDropdown(false)
-                  setShowLoginModal(true)
-                }}
-              >
-                {pageT.login}
               </button>
             </div>
           )}

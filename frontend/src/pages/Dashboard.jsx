@@ -178,6 +178,9 @@ function Dashboard() {
   if (loading) {
     return (
       <div className="ultra-dashboard">
+        <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+          ← Back
+        </button>
         <div className="ultra-grid">
           {[1, 2, 3, 4].map((item) => (
             <div key={item} className="skeleton-card">
@@ -194,6 +197,9 @@ function Dashboard() {
   if (!data) {
     return (
       <div className="ultra-dashboard">
+        <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+          ← Back
+        </button>
         <div className="empty-state-card">
           <h3>{t.noDashboardData}</h3>
           <p>Complete your profile to unlock AI recommendations and score trends.</p>
@@ -215,6 +221,9 @@ function Dashboard() {
 
   return (
     <div className="ultra-dashboard">
+      <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+        ← Back
+      </button>
       <div className="dashboard-header">
         <h1>{t.dashboard}</h1>
         <div className="tab-buttons">

@@ -16,7 +16,7 @@ function Signup() {
     email: "",
     password: "",
     confirmPassword: "",
-    nationality: "india",
+    nationality: "global",
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -160,6 +160,9 @@ function Signup() {
     <div className="auth-page signup-page">
       <div className="auth-container auth-container-single">
         <div className="auth-card">
+          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+            ← Back
+          </button>
           <div className="auth-header">
             <h1>{t.createAccount}</h1>
             <p>{t.createAccountSub}</p>

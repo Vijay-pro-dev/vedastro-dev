@@ -51,13 +51,23 @@ function Questionnaire() {
       const list = (cached.length ? cached : QUESTION_SEED).filter((q) => q.is_active !== false).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
       setQuestions(list)
       localStorage.setItem("guest_questionnaire_questions", JSON.stringify(list))
+      const savedAnswers = JSON.parse(localStorage.getItem("guest_questionnaire_answers") || "{}")
+      if (savedAnswers && Object.keys(savedAnswers).length) {
+        setAnswers(savedAnswers)
+        const nextIndex = list.findIndex((q) => !savedAnswers[q.id || q.question_id])
+        setCurrentIdx(nextIndex === -1 ? list.length - 1 : nextIndex)
+      }
       setLoading(false)
     }
     load()
   }, [])
 
   const handleAnswer = (id, value) => {
-    setAnswers((curr) => ({ ...curr, [id]: value }))
+    setAnswers((curr) => {
+      const next = { ...curr, [id]: value }
+      localStorage.setItem("guest_questionnaire_answers", JSON.stringify(next))
+      return next
+    })
     if (currentIdx < questions.length - 1) {
       setTimeout(() => setCurrentIdx((idx) => idx + 1), 150)
     } else {
