@@ -154,6 +154,18 @@ def latest_responses(current_user: models.User = Depends(get_current_user), db: 
   return {"responses": rows}
 
 
+@router.api_route("/career/responses/reset", methods=["POST", "GET"])
+def reset_responses(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+  """
+  Clear the current user's saved questionnaire responses and any derived alignment scores
+  so they can retake the assessment from scratch.
+  """
+  db.execute(text("DELETE FROM user_responses WHERE user_id = :uid"), {"uid": current_user.id})
+  db.execute(text("DELETE FROM career_alignment_scores WHERE user_id = :uid"), {"uid": current_user.id})
+  db.commit()
+  return {"message": "Responses reset"}
+
+
 @router.get("/career/alignment/latest")
 def latest_alignment(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
   """Return the latest career alignment snapshot for the current user, or on-the-fly aggregation if none exists."""

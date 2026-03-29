@@ -4671,6 +4671,25 @@ background-clip: text;
   gap: 10px;
   margin-bottom: 14px;
 }
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.retake-btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(120deg, #f59e0b, #a855f7);
+  color: #0b1020;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+.retake-btn:hover:enabled { transform: translateY(-1px); filter: brightness(1.05); }
+.retake-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
 .pill.dark {
   background: rgba(255, 255, 255, 0.06);

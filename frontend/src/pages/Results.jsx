@@ -27,6 +27,7 @@ function Results() {
   const [apiAnswers, setApiAnswers] = useState(null)
   const [apiQuestions, setApiQuestions] = useState(null)
   const [alignment, setAlignment] = useState(null)
+  const [retakeLoading, setRetakeLoading] = useState(false)
 
   // Try to hydrate answers/questions from backend if authenticated
   useEffect(() => {
@@ -253,6 +254,28 @@ function Results() {
     }
   }, [elementBreakdown])
 
+  const handleRetake = async () => {
+    if (retakeLoading) return
+    setRetakeLoading(true)
+    try {
+      // clear local cached answers/questions
+      localStorage.removeItem("guest_questionnaire_answers")
+      localStorage.removeItem("guest_questionnaire_questions")
+      // ask backend to start a fresh attempt if logged in
+      const token = localStorage.getItem("token")
+      if (token) {
+        try {
+          await api.post("/career/responses/reset")
+        } catch (err) {
+          console.warn("Retake reset failed (non-blocking)", err)
+        }
+      }
+    } finally {
+      setRetakeLoading(false)
+      navigate("/questionnaire")
+    }
+  }
+
   return (
     <div className="results-shell">
       <button type="button" className="back-btn" onClick={() => navigate(-1)}>
@@ -306,7 +329,12 @@ function Results() {
               <h3>Alignment Snapshot</h3>
               <p>Your clarity, timing, and execution scores derived from your inputs.</p>
             </div>
-            <span className="pill dark">20 Questions</span>
+            <div className="card-actions">
+              <span className="pill dark">20 Questions</span>
+              <button type="button" className="retake-btn" onClick={handleRetake} disabled={retakeLoading}>
+                {retakeLoading ? "Starting..." : "Retake Assessment"}
+              </button>
+            </div>
           </div>
           <div className="mini-metric-grid">
             <div className="mini-metric-card">
