@@ -18,6 +18,12 @@ class QuestionBase(BaseModel):
         max_length=100,
         description="Element bucket for grouping questions",
     )
+    category: Optional[str] = Field(
+        default=None,
+        min_length=0,
+        max_length=255,
+        description="Category name (Awareness/Time/Action) from master_category",
+    )
 
 
 class QuestionCreate(QuestionBase):

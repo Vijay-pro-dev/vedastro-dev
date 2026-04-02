@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, Float, Integer, String, Text
 
 from app.core.database import Base
 
@@ -31,6 +31,11 @@ class User(Base):
     locked_until = Column(DateTime, nullable=True)
     refresh_token_version = Column(Integer, default=0)
     profile_pic = Column(String, nullable=True)
+    user_type_id = Column(Integer, nullable=True)
+    referral_code = Column(String(20), nullable=True)
+    referred_by = Column(BigInteger, nullable=True)
+    is_verified = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now)
 
@@ -93,10 +98,8 @@ class CareerAlignmentScore(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer)
-    awareness_score = Column(Float)
-    time_alignment_score = Column(Float)
-    action_integrity_score = Column(Float)
-    overall_score = Column(Float)
+    category_id = Column(Float)
+    score = Column(Integer)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now)
 

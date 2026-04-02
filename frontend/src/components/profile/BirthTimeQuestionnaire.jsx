@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { api } from "../../lib/api"
 
-function BirthTimeQuestionnaire({ onComplete }) {
+function BirthTimeQuestionnaire({ onComplete, onClose }) {
   const [currentStep, setCurrentStep] = useState(0)
   const [responses, setResponses] = useState({
     life_turning_points: "",
@@ -63,6 +63,9 @@ function BirthTimeQuestionnaire({ onComplete }) {
     return (
       <div className="questionnaire-container">
         <div className="questionnaire-card">
+          <button className="questionnaire-close" aria-label="Close" onClick={() => onClose?.()}>
+            ✕
+          </button>
           <h3>Birth Time Estimation Complete</h3>
           <div className="result-box">
             <p><strong>Estimated Birth Time:</strong> {result.estimated_time}</p>
@@ -80,6 +83,9 @@ function BirthTimeQuestionnaire({ onComplete }) {
   return (
     <div className="questionnaire-container">
       <div className="questionnaire-card">
+        <button className="questionnaire-close" aria-label="Close" onClick={() => onClose?.()}>
+          ✕
+        </button>
         <div className="progress-bar">
           <div className="progress" style={{ width: `${((currentStep + 1) / questions.length) * 100}%` }} />
         </div>

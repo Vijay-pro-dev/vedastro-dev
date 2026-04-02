@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Bar,
@@ -97,7 +97,7 @@ function AdminPanel() {
   const [subsectionOptions, setSubsectionOptions] = useState([])
   const [showMenu, setShowMenu] = useState(false)
   const [newSection, setNewSection] = useState("")
-  const [newSubsection, setNewSubsection] = useState("")
+  const [newElement, setNewElement] = useState("")
   const [questionForm, setQuestionForm] = useState({
     question_text: "",
     answer_type: "radio",
@@ -108,14 +108,16 @@ function AdminPanel() {
     user_type_code: "GENERAL",
     section: "Awareness",
     subsection: "Fire",
+    category: "Awareness",
   })
 
   const activeSectionNames = sectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
   const activeSubsectionNames = subsectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
+  const [categoryOptions, setCategoryOptions] = useState([])
 
   const getAdminToken = () => localStorage.getItem("admin_token")
 
-  const loadAdminData = async () => {
+  const loadAdminData = useCallback(async () => {
     const adminToken = getAdminToken()
     const response = await api.get("/admin/dashboard", {
       headers: {
@@ -123,7 +125,7 @@ function AdminPanel() {
       },
     })
     setData(response.data)
-  }
+  }, [])
 
   useEffect(() => {
     const loadAdminDashboard = async () => {
@@ -146,10 +148,8 @@ function AdminPanel() {
       }
     }
 
-    // The dashboard bootstrap intentionally runs once on page load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAdminDashboard()
-  }, [navigate])
+  }, [navigate, loadAdminData, showError])
 
   const loadQuestions = async () => {
     setQuestionLoading(true)
@@ -390,13 +390,14 @@ function AdminPanel() {
 
   const handleQuestionSubmit = async (event) => {
     event.preventDefault()
-    const payload = {
-      ...questionForm,
-      score: Number(questionForm.score),
-      display_order: Number(questionForm.display_order),
-      subsection: questionForm.subsection,
-      section: questionForm.section,
-    }
+      const payload = {
+        ...questionForm,
+        score: Number(questionForm.score),
+        display_order: Number(questionForm.display_order),
+        subsection: questionForm.subsection,
+        section: questionForm.section,
+        category: questionForm.category,
+      }
     if (!payload.question_text.trim()) {
       showError("Question text is required.")
       return
@@ -453,6 +454,7 @@ function AdminPanel() {
       user_type_code: question.user_type_code || "GENERAL",
       section: question.section || "Awareness",
       subsection: question.subsection || "Fire",
+      category: question.category || "Awareness",
     })
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -499,14 +501,17 @@ function AdminPanel() {
   const loadConfigOptions = async () => {
     const adminToken = getAdminToken()
     try {
-      const [sectionsRes, subsectionsRes] = await Promise.all([
-        api.get("/admin/config/sections", { headers: { Authorization: `Bearer ${adminToken}` } }),
-        api.get("/admin/config/subsections", { headers: { Authorization: `Bearer ${adminToken}` } }),
-      ])
+    const [sectionsRes, subsectionsRes, categoriesRes] = await Promise.all([
+      api.get("/admin/config/sections", { headers: { Authorization: `Bearer ${adminToken}` } }),
+      api.get("/admin/config/element", { headers: { Authorization: `Bearer ${adminToken}` } }),
+      api.get("/admin/config/categories", { headers: { Authorization: `Bearer ${adminToken}` } }),
+    ])
       const sections = sectionsRes.data?.sections || []
       const subsections = subsectionsRes.data?.subsections || []
+      const categories = categoriesRes.data?.categories || []
       setSectionOptions(sections)
       setSubsectionOptions(subsections)
+      setCategoryOptions(categories)
     } catch (error) {
       console.warn("Config load failed, using defaults", error)
     }
@@ -531,18 +536,18 @@ function AdminPanel() {
   }
 
   const handleAddSubsection = async () => {
-    if (!newSubsection.trim()) return
+    if (!newElement.trim()) return
     const adminToken = getAdminToken()
     try {
       const res = await api.post(
-        "/admin/config/subsections",
-        { name: newSubsection.trim(), display_order: subsectionOptions.length + 1, is_active: true },
+        "/admin/config/element",
+        { name: newElement.trim(), display_order: subsectionOptions.length + 1, is_active: true },
         { headers: { Authorization: `Bearer ${adminToken}` } },
       )
       const created = res.data?.subsection
       setSubsectionOptions((current) => [...current, created])
-      setNewSubsection("")
-      showSuccess("Subsection added.")
+      setNewElement("")
+      showSuccess("Element added.")
     } catch (error) {
       showError(getErrorMessage(error))
     }
@@ -562,9 +567,9 @@ function AdminPanel() {
   const handleDeleteSubsection = async (subId) => {
     const adminToken = getAdminToken()
     try {
-      await api.delete(`/admin/config/subsections/${subId}`, { headers: { Authorization: `Bearer ${adminToken}` } })
+      await api.delete(`/admin/config/element/${subId}`, { headers: { Authorization: `Bearer ${adminToken}` } })
       setSubsectionOptions((current) => current.filter((s) => s.id !== subId))
-      showSuccess("Subsection removed.")
+      showSuccess("Element removed.")
     } catch (error) {
       showError(getErrorMessage(error))
     }
@@ -614,7 +619,7 @@ function AdminPanel() {
   const visibleQuestions = showAllQuestions ? filteredQuestions : filteredQuestions.slice(0, 4)
 
   const stats = data?.stats || {}
-  const users = data?.users ?? []
+  const users = useMemo(() => data?.users ?? [], [data])
   const recentUsers = data?.recent_users || []
   const systemOverview = data?.system_overview || {}
   const recentActivityLogs = data?.recent_activity_logs || []
@@ -662,9 +667,17 @@ function AdminPanel() {
     setShowAllQuestions(false)
   }, [questionFilter])
 
+  const [activeSection, setActiveSection] = useState("dashboard")
+
   const scrollToSection = (id) => {
     const el = document.getElementById(id)
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  const handleSectionSelect = (id) => {
+    setActiveSection(id)
+    setShowMenu(false)
+    setTimeout(() => scrollToSection(id), 40)
   }
 
   if (loading) {
@@ -706,28 +719,70 @@ function AdminPanel() {
   return (
     <div className="admin-panel-page">
       <div className="admin-panel-shell">
-        <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-          ← Back
-        </button>
-        <button className="admin-menu-toggle" aria-expanded={showMenu} onClick={() => setShowMenu((v) => !v)}>
-          {showMenu ? "✕ Close Menu" : "☰ Menu"}
-        </button>
-        <nav className={`admin-sidebar ${showMenu ? "open" : ""}`}>
-          <span className="admin-sidebar-title">Menu</span>
-          <button className="auth-button admin-menu-btn" onClick={() => scrollToSection("section-users")}>
-            Registered Users
+        <div className="admin-topbar">
+          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+            ← Back
           </button>
-          <button className="auth-button admin-menu-btn" onClick={() => scrollToSection("section-logs")}>
-            Recent Activity Logs
+          <button className="admin-menu-toggle" aria-expanded={showMenu} onClick={() => setShowMenu((v) => !v)}>
+            {showMenu ? "✕ Close Menu" : "☰ Menu"}
           </button>
-          <button className="auth-button admin-menu-btn" onClick={() => scrollToSection("section-config")}>
-            Config: Sections &amp; Subsections
-          </button>
-          <button className="auth-button admin-menu-btn" onClick={() => scrollToSection("section-questions")}>
-            Question Bank
-          </button>
-        </nav>
-        <div className="admin-main">
+        </div>
+
+        <div className="admin-layout">
+          <nav className={`admin-sidebar ${showMenu ? "open" : ""}`}>
+            <div className="admin-brand">
+              <div className="admin-brand-mark">V</div>
+              <div>
+                <p className="admin-brand-label">Vedastro</p>
+                <span className="admin-brand-sub">Admin Console</span>
+              </div>
+            </div>
+
+            <div className="admin-profile-chip">
+              <span className="chip-dot live" />
+              <div>
+                <p className="chip-title">Vedastro Group</p>
+                <span className="chip-sub">Admin</span>
+              </div>
+            </div>
+
+            <div className="admin-menu-section">
+              <p className="admin-menu-heading">Overview</p>
+              <button className="admin-menu-item" onClick={() => handleSectionSelect("dashboard")}>
+                <span className="admin-menu-icon">🏠</span>
+                <span>Dashboard</span>
+                <span className="admin-menu-badge">{stats.total_users || 0}</span>
+              </button>
+              <button className="admin-menu-item" onClick={() => handleSectionSelect("users")}>
+                <span className="admin-menu-icon">👥</span>
+                <span>User Management</span>
+                <span className="admin-menu-badge">{users.length}</span>
+              </button>
+              <button className="admin-menu-item" onClick={() => handleSectionSelect("activity")}>
+                <span className="admin-menu-icon">🗒️</span>
+                <span>Activity Logs</span>
+              </button>
+              <button className="admin-menu-item" onClick={() => handleSectionSelect("config")}>
+                <span className="admin-menu-icon">🛠️</span>
+                <span>Config</span>
+              </button>
+              <button className="admin-menu-item" onClick={() => handleSectionSelect("questions")}>
+                <span className="admin-menu-icon">❓</span>
+                <span>Question Bank</span>
+                <span className="admin-menu-pill">Updated</span>
+              </button>
+            </div>
+
+            <div className="admin-sidebar-footer">
+              <p className="footer-title">Export Report</p>
+              <p className="footer-copy">Unlock bulk exports and advanced analytics for your team.</p>
+              <button className="footer-button" onClick={handleExportCsv}>
+                Download Report
+              </button>
+            </div>
+          </nav>
+
+          <div className="admin-main">
         <div className="admin-panel-header">
           <div>
             <h1>Admin Panel</h1>
@@ -743,7 +798,9 @@ function AdminPanel() {
           </div>
         </div>
 
-        <div className="admin-stats-grid" id="section-users">
+        {activeSection === "dashboard" && (
+          <>
+        <div className="admin-stats-grid" id="dashboard">
           <div className="admin-stat-card">
             <span>Total Users</span>
             <strong>{stats.total_users || 0}</strong>
@@ -867,6 +924,30 @@ function AdminPanel() {
           </div>
         </div>
 
+        <div className="admin-panel-card">
+          <div className="admin-table-header">
+            <h3>Recent Signups</h3>
+            <span>{recentUsersOnly.length} recent records</span>
+          </div>
+          <div className="admin-recent-grid">
+            {recentUsersOnly.length ? recentUsersOnly.map((user) => (
+              <div key={user.user_id} className="admin-recent-card">
+                <strong>{user.name}</strong>
+                <span>{user.email}</span>
+                <small>{user.current_role}</small>
+                <em>{user.created_at ? new Date(user.created_at).toLocaleDateString() : "-"}</em>
+              </div>
+            )) : (
+              <div className="empty-state-card compact">
+                <p>No recent signups yet.</p>
+              </div>
+            )}
+          </div>
+        </div>
+          </>
+        )}
+
+        {activeSection === "questions" && (
         <div className="admin-panel-card admin-questions-card" id="section-questions">
           <div className="admin-table-header">
             <div>
@@ -916,7 +997,7 @@ function AdminPanel() {
                 </select>
               </label>
               <label>
-                <span>Subsection (Elements)</span>
+                <span>Element</span>
                 <select
                   value={questionForm.subsection}
                   onChange={(event) => setQuestionForm((current) => ({ ...current, subsection: event.target.value }))}
@@ -924,6 +1005,25 @@ function AdminPanel() {
                   {activeSubsectionNames.map((option) => (
                     <option key={option} value={option}>
                       {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Category</span>
+                <select
+                  value={questionForm.category}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, category: event.target.value }))}
+                >
+                  {(categoryOptions.length
+                    ? categoryOptions
+                    : [
+                        { id: 1, name: "Awareness" },
+                        { id: 2, name: "Time" },
+                        { id: 3, name: "Action" },
+                      ]).map((c) => (
+                    <option key={c.id || c.name} value={c.name}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -1025,7 +1125,8 @@ function AdminPanel() {
                       <span>Type: {question.answer_type}</span>
                       <span>Order: {question.display_order}</span>
                       <span>User: {question.user_type_code || "GENERAL"}</span>
-                      <span>Subsection: {question.subsection || "-"}</span>
+                      <span>Element: {question.subsection || "-"}</span>
+                      <span>Category: {question.category || "-"}</span>
                       <span>{question.is_required ? "Required" : "Optional"}</span>
                     </div>
                   </div>
@@ -1052,10 +1153,12 @@ function AdminPanel() {
             </div>
           )}
         </div>
+        )}
 
+        {activeSection === "config" && (
         <div className="admin-panel-card" id="section-config">
           <div className="admin-table-header">
-            <h3>Config: Sections & Subsections</h3>
+            <h3>Config: Sections & Elements</h3>
           </div>
           <div className="admin-config-grid">
             <div className="admin-config-block">
@@ -1081,7 +1184,7 @@ function AdminPanel() {
               </div>
             </div>
             <div className="admin-config-block">
-              <h4>Subsections</h4>
+              <h4>Elements</h4>
               <ul className="admin-config-list">
                 {subsectionOptions.map((s) => (
                   <li key={s.id}>
@@ -1093,9 +1196,9 @@ function AdminPanel() {
               <div className="admin-config-add">
                 <input
                   className="admin-search"
-                  placeholder="Add new subsection"
-                  value={newSubsection}
-                  onChange={(e) => setNewSubsection(e.target.value)}
+                  placeholder="Add new element"
+                  value={newElement}
+                  onChange={(e) => setNewElement(e.target.value)}
                 />
                 <button className="auth-button" onClick={handleAddSubsection}>
                   Add
@@ -1104,28 +1207,9 @@ function AdminPanel() {
             </div>
           </div>
         </div>
+        )}
 
-        <div className="admin-panel-card">
-          <div className="admin-table-header">
-            <h3>Recent Signups</h3>
-            <span>{recentUsersOnly.length} recent records</span>
-          </div>
-          <div className="admin-recent-grid">
-            {recentUsersOnly.length ? recentUsersOnly.map((user) => (
-              <div key={user.user_id} className="admin-recent-card">
-                <strong>{user.name}</strong>
-                <span>{user.email}</span>
-                <small>{user.current_role}</small>
-                <em>{user.created_at ? new Date(user.created_at).toLocaleDateString() : "-"}</em>
-              </div>
-            )) : (
-              <div className="empty-state-card compact">
-                <p>No recent signups yet.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
+        {activeSection === "activity" && (
         <div className="admin-panel-card" id="section-logs">
           <div className="admin-table-header">
             <h3>Recent Activity Logs</h3>
@@ -1152,7 +1236,9 @@ function AdminPanel() {
             </button>
           </div>
         </div>
+        )}
 
+        {activeSection === "users" && (
         <div className="admin-panel-card" id="section-users-list">
           <div className="admin-table-header">
             <h3>Registered Users</h3>
@@ -1272,6 +1358,7 @@ function AdminPanel() {
             </div>
           )}
         </div>
+        )}
 
         {(selectedUser || profileLoading) && (
           <div className="admin-profile-overlay" onClick={() => setSelectedUser(null)}>
@@ -1385,6 +1472,7 @@ function AdminPanel() {
             </div>
           </div>
         )}
+          </div>
         </div>
       </div>
     </div>

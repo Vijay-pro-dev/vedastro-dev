@@ -27,11 +27,12 @@ function Dashboard() {
   const { showError } = useToast()
   const [data, setData] = useState(null)
   const [activeTab, setActiveTab] = useState("overview")
-  const [authPrompt, setAuthPrompt] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showAccuracyModal, setShowAccuracyModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const performanceRef = useRef(null)
+  const accuracyDismissed = useRef(false)
+  const [showTop, setShowTop] = useState(false)
 
   // If user already answered questionnaire, always use new dashboard
   useEffect(() => {
@@ -150,22 +151,24 @@ function Dashboard() {
       }
     }
 
-    // Dashboard data is fetched once when the screen mounts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadDashboard()
-  }, [])
+  }, [location.state?.guestProfile, showError, updateUser, navigate])
 
   // Show modal when performance summary scrolls into view (trends tab)
   useEffect(() => {
     if (activeTab !== "trends") return
     const node = performanceRef.current
-    if (!node || showAccuracyModal) return
+    if (!node) return
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            setShowAccuracyModal(true)
-            observer.disconnect()
+            if (!accuracyDismissed.current) {
+              setShowAccuracyModal(true)
+            }
+          } else {
+            // reset dismissal after user leaves the section so it can show again on next visit
+            accuracyDismissed.current = false
           }
         })
       },
@@ -173,7 +176,14 @@ function Dashboard() {
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [activeTab, showAccuracyModal])
+  }, [activeTab])
+
+  // Show "back to top" button after scrolling
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 240)
+    window.addEventListener("scroll", onScroll)
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
 
   if (loading) {
     return (
@@ -338,9 +348,22 @@ function Dashboard() {
       )}
 
       {showAccuracyModal && (
-        <div className="lock-overlay auth-modal" onClick={() => setShowAccuracyModal(false)}>
+        <div
+          className="lock-overlay auth-modal"
+          onClick={() => {
+            setShowAccuracyModal(false)
+            accuracyDismissed.current = true
+          }}
+        >
           <div className="lock-dialog" onClick={(e) => e.stopPropagation()}>
-            <button className="ghost-close icon" onClick={() => setShowAccuracyModal(false)} aria-label="Close dialog">
+            <button
+              className="ghost-close icon"
+              onClick={() => {
+                setShowAccuracyModal(false)
+                accuracyDismissed.current = true
+              }}
+              aria-label="Close dialog"
+            >
               ×
             </button>
             <h3>For more accurate result</h3>
@@ -462,6 +485,12 @@ function Dashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {showTop && (
+        <button className="top-button" type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top">
+          ↑
+        </button>
       )}
     </div>
   )

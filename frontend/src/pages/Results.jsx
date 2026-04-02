@@ -28,6 +28,7 @@ function Results() {
   const [apiQuestions, setApiQuestions] = useState(null)
   const [alignment, setAlignment] = useState(null)
   const [retakeLoading, setRetakeLoading] = useState(false)
+  const [showTop, setShowTop] = useState(false)
 
   // Try to hydrate answers/questions from backend if authenticated
   useEffect(() => {
@@ -67,6 +68,12 @@ function Results() {
       }
     }
     load()
+  }, [])
+
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 240)
+    window.addEventListener("scroll", onScroll)
+    return () => window.removeEventListener("scroll", onScroll)
   }, [])
   const draft = useMemo(() => {
     const stored = JSON.parse(localStorage.getItem("guest_profile_draft") || "{}")
@@ -278,7 +285,7 @@ function Results() {
 
   return (
     <div className="results-shell">
-      <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+      <button type="button" className="back-btn" onClick={() => navigate("/", { replace: true })}>
         ← Back
       </button>
       <div className="cosmic-top">
@@ -441,6 +448,12 @@ function Results() {
           </ul>
         </div>
       </div>
+
+      {showTop && (
+        <button className="top-button" type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top">
+          ↑
+        </button>
+      )}
     </div>
   )
 }

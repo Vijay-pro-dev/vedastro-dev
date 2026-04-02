@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "../components/shared/ToastProvider"
+import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
 import { FiArrowLeft, FiArrowRight } from "react-icons/fi"
 
@@ -29,7 +30,7 @@ const QUESTION_SEED = [
   { question_text: "Do you track your progress regularly?", section: "Action", display_order: 20 },
 ].map((item, index) => ({
   ...item,
-  id: `seed-${index + 1}`,
+  question_id: `seed-${index + 1}`,
   answer_type: "radio",
   score: 3,
   is_required: true,
@@ -40,27 +41,46 @@ const QUESTION_SEED = [
 function Questionnaire() {
   const navigate = useNavigate()
   const { showError, showSuccess } = useToast()
+  const { user } = useUser()
   const [questions, setQuestions] = useState([])
   const [answers, setAnswers] = useState({})
   const [loading, setLoading] = useState(true)
   const [currentIdx, setCurrentIdx] = useState(0)
 
   useEffect(() => {
-    const load = () => {
-      const cached = JSON.parse(localStorage.getItem(LOCAL_QUESTION_CACHE_KEY) || "[]")
-      const list = (cached.length ? cached : QUESTION_SEED).filter((q) => q.is_active !== false).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
-      setQuestions(list)
-      localStorage.setItem("guest_questionnaire_questions", JSON.stringify(list))
-      const savedAnswers = JSON.parse(localStorage.getItem("guest_questionnaire_answers") || "{}")
-      if (savedAnswers && Object.keys(savedAnswers).length) {
-        setAnswers(savedAnswers)
-        const nextIndex = list.findIndex((q) => !savedAnswers[q.id || q.question_id])
-        setCurrentIdx(nextIndex === -1 ? list.length - 1 : nextIndex)
+    const load = async () => {
+      try {
+        const cached = JSON.parse(localStorage.getItem(LOCAL_QUESTION_CACHE_KEY) || "[]")
+        setLoading(true)
+        const userTypeId = user?.user_type_id
+        const resp = await api.get("/career/questions", { params: userTypeId ? { user_type_id: userTypeId } : {} })
+        const fetched = (resp.data?.questions || resp.data || []).filter((q) => q.is_active !== false)
+        const list = fetched.length
+          ? fetched.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+          : cached.length
+            ? cached
+            : QUESTION_SEED
+        setQuestions(list)
+        localStorage.setItem(LOCAL_QUESTION_CACHE_KEY, JSON.stringify(list))
+        localStorage.setItem("guest_questionnaire_questions", JSON.stringify(list))
+        const savedAnswers = JSON.parse(localStorage.getItem("guest_questionnaire_answers") || "{}")
+        if (savedAnswers && Object.keys(savedAnswers).length) {
+          setAnswers(savedAnswers)
+          const nextIndex = list.findIndex((q) => !savedAnswers[q.question_id || q.id])
+          setCurrentIdx(nextIndex === -1 ? list.length - 1 : nextIndex)
+        }
+      } catch (err) {
+        console.warn("Falling back to cached/seed questions", err)
+        const cached = JSON.parse(localStorage.getItem(LOCAL_QUESTION_CACHE_KEY) || "[]")
+        const list = (cached.length ? cached : QUESTION_SEED).filter((q) => q.is_active !== false).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+        setQuestions(list)
+        localStorage.setItem("guest_questionnaire_questions", JSON.stringify(list))
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     load()
-  }, [])
+  }, [user])
 
   const handleAnswer = (id, value) => {
     setAnswers((curr) => {
@@ -93,10 +113,9 @@ function Questionnaire() {
             const hasNumericId = Number.isInteger(numericId)
             return {
               question_id: hasNumericId ? numericId : null,
-              answer: answers[q.id || q.question_id],
+              answer: answers[q.question_id || q.id],
             }
           })
-          // only send rows that have both an answer and a valid numeric question_id (i.e., exist in DB)
           .filter((item) => item.answer && item.question_id !== null),
       }
       if (payload.answers.length > 0) {
@@ -148,6 +167,9 @@ function Questionnaire() {
     <div className="questionnaire-shell">
       <div className="question-window">
         <div className="window-bar">
+          <button className="window-back" type="button" onClick={() => navigate(-1)} aria-label="Go back">
+            ←
+          </button>
           <span className="dot red" />
           <span className="dot yellow" />
           <span className="dot green" />
@@ -155,6 +177,9 @@ function Questionnaire() {
         </div>
         <div className="question-body">
           <p className="question-text">{currentQuestion.question_text}</p>
+          <p className="question-caption">
+            Answer thoughtfully — honest inputs make your guidance sharper.
+          </p>
           <div className="qa-answers centered">
             {[1, 2, 3, 4, 5].map((val) => (
               <label key={val} className={`likert big ${selected === val ? "selected" : ""}`}>

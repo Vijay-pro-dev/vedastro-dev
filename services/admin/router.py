@@ -68,23 +68,6 @@ def _get_or_create_section(db: Session, name: str) -> models.Section:
     return section
 
 
-def _get_or_create_subsection(db: Session, name: str | None) -> models.Subsection | None:
-    if not name:
-        return None
-    subsection = (
-        db.query(models.Subsection)
-        .filter(models.Subsection.name.ilike(name.strip()))
-        .first()
-    )
-    if subsection:
-        return subsection
-    subsection = models.Subsection(name=name.strip(), display_order=1, is_active=True)
-    db.add(subsection)
-    db.commit()
-    db.refresh(subsection)
-    return subsection
-
-
 def _user_type_by_code_or_404(db: Session, type_code: str) -> models.UserType:
     record = (
         db.query(models.UserType)
@@ -97,7 +80,18 @@ def _user_type_by_code_or_404(db: Session, type_code: str) -> models.UserType:
     return record
 
 
-def _serialize_question(question: models.Question, user_type_code: str | None = None, subsection_lookup: dict[int, str] | None = None) -> dict:
+def _category_id_by_name(db: Session, name: str | None) -> int | None:
+    if not name:
+        return None
+    cat = db.query(models.Category).filter(models.Category.category_name.ilike(name.strip())).first()
+    return cat.id if cat else None
+
+
+def _category_lookup(db: Session) -> dict[int, str]:
+    return {c.id: c.category_name for c in db.query(models.Category).all()}
+
+
+def _serialize_question(question: models.Question, user_type_code: str | None = None, section_lookup: dict[int, str] | None = None) -> dict:
     def derive_section(order: int | None) -> str:
         if order is None:
             return "Awareness"
@@ -108,17 +102,14 @@ def _serialize_question(question: models.Question, user_type_code: str | None = 
         return "Action"
 
     section = None
-    if isinstance(question.category_id, dict):
-        section = question.category_id.get("section")
-    elif isinstance(question.category_id, str):
-        section = question.category_id
+    if section_lookup and getattr(question, "section_id", None):
+        section = section_lookup.get(question.section_id)
     if not section:
-        section = derive_section(question.display_order)
+        section = derive_section(getattr(question, "display_order", None))
     element = None
-    if subsection_lookup and question.subcategory_id in subsection_lookup:
-        element = subsection_lookup[question.subcategory_id]
-    else:
-        element = CODE_TO_ELEMENT.get(question.subcategory_id, None)
+    if getattr(question, "element_id", None):
+        element = getattr(question, "element_id")
+    category_id = getattr(question, "category_id", None)
     return {
         "id": question.id,
         "question_id": question.id,
@@ -130,6 +121,7 @@ def _serialize_question(question: models.Question, user_type_code: str | None = 
         "is_active": bool(question.is_active),
         "subsection": element,
         "section": section,
+        "category_id": category_id,
         "user_type_code": user_type_code or "GENERAL",
         "created_at": question.created_at.isoformat() if question.created_at else None,
         "updated_at": question.updated_at.isoformat() if question.updated_at else None,
@@ -151,10 +143,10 @@ def _seed_questions_if_empty(db: Session) -> None:
     _ensure_config_defaults(db)
     count = db.query(models.Question).count()
     if count > 0:
-        _backfill_subcategory_ids(db)
         return
     general_type = _ensure_default_user_types(db)
     for text, answer_type, score, order, required, section, subsection in SEED_QUESTIONS:
+        section_obj = _get_or_create_section(db, "Career")
         q = models.Question(
             question_text=text,
             answer_type=answer_type,
@@ -162,8 +154,8 @@ def _seed_questions_if_empty(db: Session) -> None:
             is_required=required,
             display_order=order,
             is_active=True,
-            subcategory_id=ELEMENT_TO_CODE.get(subsection),
-            category_id=section,
+            section_id=section_obj.id,
+            category_id=None,
             created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         db.add(q)
@@ -172,56 +164,12 @@ def _seed_questions_if_empty(db: Session) -> None:
     db.commit()
 
 
-def _backfill_subcategory_ids(db: Session) -> None:
-    _ensure_config_defaults(db)
-    rows = db.query(models.Question).filter(
-        (models.Question.subcategory_id == None) | (models.Question.category_id == None)  # noqa: E711
-    ).all()
-    if not rows:
-        return
-
-    def map_code(order: int) -> int:
-        if 14 <= order <= 17:
-            return ELEMENT_TO_CODE["Fire"]
-        if 18 <= order <= 20:
-            return ELEMENT_TO_CODE["Earth"]
-        if order in (1, 2, 3, 6):
-            return ELEMENT_TO_CODE["Air"]
-        if order in (4, 5, 7):
-            return ELEMENT_TO_CODE["Water"]
-        if 8 <= order <= 13:
-            return ELEMENT_TO_CODE["Space"]
-        return ELEMENT_TO_CODE["Air"]
-
-    for q in rows:
-        code = map_code(q.display_order or 0)
-        q.subcategory_id = q.subcategory_id or code
-        # derive section
-        if 1 <= (q.display_order or 0) <= 7:
-            section = "Awareness"
-        elif 8 <= (q.display_order or 0) <= 13:
-            section = "Alignment / Time"
-        else:
-            section = "Action"
-        section_obj = _get_or_create_section(db, section)
-        # if subcategory_id set from code, ensure subsection exists
-        if q.subcategory_id:
-            _get_or_create_subsection(db, CODE_TO_ELEMENT.get(q.subcategory_id))
-        q.category_id = section_obj.name
-    db.commit()
-
-
 def _ensure_config_defaults(db: Session) -> None:
-    default_sections = [("Awareness", 1), ("Alignment / Time", 2), ("Action", 3)]
-    default_subsections = [("Fire", 1), ("Earth", 2), ("Air", 3), ("Water", 4), ("Space", 5)]
+    default_sections = [("Career", 1), ("Relationship", 2), ("Finance", 3), ("Health", 4)]
     for name, order in default_sections:
         existing = db.query(models.Section).filter(models.Section.name.ilike(name)).first()
         if not existing:
             db.add(models.Section(name=name, display_order=order, is_active=True))
-    for name, order in default_subsections:
-        existing = db.query(models.Subsection).filter(models.Subsection.name.ilike(name)).first()
-        if not existing:
-            db.add(models.Subsection(name=name, display_order=order, is_active=True))
     db.commit()
 
 
@@ -369,7 +317,9 @@ def delete_all_activity_logs(_: dict = Depends(get_current_admin), db: Session =
 def list_questions(_: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Return all questions with their mapped user type codes (if any)."""
     _ensure_config_defaults(db)
-    subsection_lookup = {s.id: s.name for s in db.query(models.Subsection).all()}
+    section_lookup = {s.id: s.name for s in db.query(models.Section).all()}
+    element_lookup = {e.id: e.name for e in db.query(models.Element).all()}
+    category_lookup = _category_lookup(db)
     rows = (
         db.query(models.Question, models.UserType.type_code)
         .join(models.QuestionUserTypeMap, models.Question.id == models.QuestionUserTypeMap.question_id, isouter=True)
@@ -377,7 +327,13 @@ def list_questions(_: dict = Depends(get_current_admin), db: Session = Depends(g
         .order_by(models.Question.display_order.asc(), models.Question.id.asc())
         .all()
     )
-    questions = [_serialize_question(q, code, subsection_lookup) for q, code in rows]
+    def serialize(q, code):
+        elem_name = element_lookup.get(getattr(q, "element_id", None))
+        data = _serialize_question(q, code, section_lookup)
+        data["element"] = elem_name
+        data["category"] = category_lookup.get(getattr(q, "category_id", None))
+        return data
+    questions = [serialize(q, code) for q, code in rows]
     return {"questions": questions}
 
 
@@ -390,7 +346,9 @@ def create_question(
     """Create a new question and map it to a user type."""
     user_type = _user_type_by_code_or_404(db, payload.user_type_code)
     section = _get_or_create_section(db, payload.section)
-    subsection = _get_or_create_subsection(db, payload.subsection)
+    element = db.query(models.Element).filter(models.Element.name.ilike((payload.subsection or "").strip())).first()
+    category_id = _category_id_by_name(db, getattr(payload, "category", None)) or _category_id_by_name(db, payload.section)
+    category_id = _category_id_by_name(db, getattr(payload, "category", None)) or _category_id_by_name(db, payload.section)
 
     question = models.Question(
         question_text=payload.question_text,
@@ -399,8 +357,9 @@ def create_question(
         is_required=payload.is_required,
         display_order=payload.display_order,
         is_active=payload.is_active,
-        subcategory_id=subsection.id if subsection else None,
-        category_id=section.name,
+        section_id=section.id,
+        element_id=element.id if element else None,
+        category_id=category_id,
         created_by=admin.get("id"),
         updated_by=admin.get("id"),
     )
@@ -411,8 +370,12 @@ def create_question(
     db.add(link)
     db.commit()
     db.refresh(question)
-    subsection_lookup = {subsection.id: subsection.name} if subsection else {}
-    return {"question": _serialize_question(question, user_type.type_code, subsection_lookup)}
+    section_lookup = {section.id: section.name}
+    element_lookup = {element.id: element.name} if element else {}
+    data = _serialize_question(question, user_type.type_code, section_lookup)
+    if element:
+        data["element"] = element.name
+    return {"question": data}
 
 
 @router.put("/questions/{question_id}")
@@ -429,7 +392,7 @@ def update_question(
 
     user_type = _user_type_by_code_or_404(db, payload.user_type_code)
     section = _get_or_create_section(db, payload.section)
-    subsection = _get_or_create_subsection(db, payload.subsection)
+    element = db.query(models.Element).filter(models.Element.name.ilike((payload.subsection or "").strip())).first()
 
     question.question_text = payload.question_text
     question.answer_type = payload.answer_type
@@ -437,8 +400,9 @@ def update_question(
     question.is_required = payload.is_required
     question.display_order = payload.display_order
     question.is_active = payload.is_active
-    question.subcategory_id = subsection.id if subsection else None
-    question.category_id = section.name
+    question.section_id = section.id
+    question.element_id = element.id if element else None
+    question.category_id = category_id
     question.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     question.updated_by = admin.get("id")
 
@@ -455,8 +419,8 @@ def update_question(
 
     db.commit()
     db.refresh(question)
-    subsection_lookup = {subsection.id: subsection.name} if subsection else {}
-    return {"question": _serialize_question(question, user_type.type_code, subsection_lookup)}
+    section_lookup = {section.id: section.name}
+    return {"question": _serialize_question(question, user_type.type_code, section_lookup)}
 
 
 @router.patch("/questions/{question_id}/status")
@@ -518,6 +482,12 @@ def list_sections(_: dict = Depends(get_current_admin), db: Session = Depends(ge
     return {"sections": [{"id": s.id, "name": s.name, "display_order": s.display_order, "is_active": s.is_active} for s in sections]}
 
 
+@router.get("/config/categories")
+def list_categories(_: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    cats = db.query(models.Category).order_by(models.Category.id.asc()).all()
+    return {"categories": [{"id": c.id, "name": c.category_name} for c in cats]}
+
+
 @router.post("/config/sections")
 def create_section(payload: SectionCreate, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
     section = _get_or_create_section(db, payload.name)
@@ -539,35 +509,32 @@ def toggle_section(section_id: int, _: dict = Depends(get_current_admin), db: Se
     return {"section": {"id": section.id, "name": section.name, "display_order": section.display_order, "is_active": section.is_active}}
 
 
-@router.get("/config/subsections")
-def list_subsections(_: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
-    subs = (
-        db.query(models.Subsection)
-        .order_by(models.Subsection.display_order.asc(), models.Subsection.name.asc())
-        .all()
-    )
-    return {"subsections": [{"id": s.id, "name": s.name, "display_order": s.display_order, "is_active": s.is_active} for s in subs]}
+@router.get("/config/element")
+def list_elements(_: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    elems = db.query(models.Element).order_by(models.Element.id.asc()).all()
+    return {"subsections": [{"id": e.id, "name": e.name, "display_order": e.id, "is_active": True} for e in elems]}
 
 
-@router.post("/config/subsections")
-def create_subsection(payload: SubsectionCreate, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
-    subsection = _get_or_create_subsection(db, payload.name)
-    subsection.display_order = payload.display_order
-    subsection.is_active = payload.is_active
-    db.commit()
-    db.refresh(subsection)
-    return {"subsection": {"id": subsection.id, "name": subsection.name, "display_order": subsection.display_order, "is_active": subsection.is_active}}
+@router.post("/config/element")
+def create_element(payload: SubsectionCreate, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name required")
+    elem = db.query(models.Element).filter(models.Element.name.ilike(name)).first()
+    if not elem:
+        elem = models.Element(name=name)
+        db.add(elem)
+        db.commit()
+        db.refresh(elem)
+    return {"subsection": {"id": elem.id, "name": elem.name, "display_order": elem.id, "is_active": True}}
 
 
-@router.patch("/config/subsections/{sub_id}/status")
-def toggle_subsection(sub_id: int, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
-    subsection = db.query(models.Subsection).filter(models.Subsection.id == sub_id).first()
-    if not subsection:
-        raise HTTPException(status_code=404, detail="Subsection not found")
-    subsection.is_active = not subsection.is_active
-    db.commit()
-    db.refresh(subsection)
-    return {"subsection": {"id": subsection.id, "name": subsection.name, "display_order": subsection.display_order, "is_active": subsection.is_active}}
+@router.patch("/config/element/{sub_id}/status")
+def toggle_element(sub_id: int, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    elem = db.query(models.Element).filter(models.Element.id == sub_id).first()
+    if not elem:
+        raise HTTPException(status_code=404, detail="Element not found")
+    return {"subsection": {"id": elem.id, "name": elem.name, "display_order": elem.id, "is_active": True}}
 
 
 @router.delete("/config/sections/{section_id}")
@@ -580,14 +547,14 @@ def delete_section(section_id: int, _: dict = Depends(get_current_admin), db: Se
     return {"message": "Section deleted", "section_id": section_id}
 
 
-@router.delete("/config/subsections/{sub_id}")
-def delete_subsection(sub_id: int, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
-    subsection = db.query(models.Subsection).filter(models.Subsection.id == sub_id).first()
-    if not subsection:
-        raise HTTPException(status_code=404, detail="Subsection not found")
-    db.delete(subsection)
+@router.delete("/config/element/{sub_id}")
+def delete_element(sub_id: int, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    elem = db.query(models.Element).filter(models.Element.id == sub_id).first()
+    if not elem:
+        raise HTTPException(status_code=404, detail="Element not found")
+    db.delete(elem)
     db.commit()
-    return {"message": "Subsection deleted", "subsection_id": sub_id}
+    return {"message": "Element deleted", "subsection_id": sub_id}
 
 
 @router.get("/users/{user_id}")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -20,6 +20,57 @@ class ResponseIn(BaseModel):
 
 class ResponsesPayload(BaseModel):
     answers: list[ResponseIn]
+
+
+@router.get("/career/questions")
+def list_career_questions(
+    user_type_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """
+    Return active career questions, optionally filtered by user_type_id.
+    """
+    if user_type_id:
+        sql = text(
+            """
+            SELECT
+              q.question_id,
+              q.question_text,
+              q.answer_type,
+              q.score,
+              q.is_required,
+              q.is_active,
+              q.display_order,
+              s.name AS section
+            FROM master_questions q
+            JOIN question_user_type_map map ON map.question_id = q.question_id
+            LEFT JOIN master_sections s ON q.section_id = s.id
+            WHERE map.user_type_id = :uid AND (q.is_active IS NULL OR q.is_active = TRUE)
+            ORDER BY COALESCE(q.display_order, 0), q.question_id
+            """
+        )
+        rows = db.execute(sql, {"uid": user_type_id}).mappings().all()
+    else:
+        sql = text(
+            """
+            SELECT
+              q.question_id,
+              q.question_text,
+              q.answer_type,
+              q.score,
+              q.is_required,
+              q.is_active,
+              q.display_order,
+              s.name AS section
+            FROM master_questions q
+            LEFT JOIN master_sections s ON q.section_id = s.id
+            WHERE (q.is_active IS NULL OR q.is_active = TRUE)
+            ORDER BY COALESCE(q.display_order, 0), q.question_id
+            """
+        )
+        rows = db.execute(sql).mappings().all()
+
+    return {"questions": rows}
 
 
 @router.get("/career/dashboard")
@@ -51,6 +102,8 @@ def save_responses(payload: ResponsesPayload, current_user: models.User = Depend
     if not payload.answers:
         raise HTTPException(status_code=400, detail="No answers provided")
 
+    answers_count = len(payload.answers)
+
     mapping = {1: 0, 2: 25, 3: 50, 4: 75, 5: 100}
     insert_sql = text(
         """
@@ -71,56 +124,11 @@ def save_responses(payload: ResponsesPayload, current_user: models.User = Depend
             },
         )
 
-    # After saving answers, compute alignment scores per section and persist to career_alignment_scores
-    try:
-        agg_sql = text(
-            """
-            WITH base AS (
-              SELECT ur.score_obtained,
-                     TRIM(BOTH '\"' FROM COALESCE(
-                       CASE WHEN jsonb_typeof(q.category_id) = 'object' THEN q.category_id->>'section' END,
-                       q.category_id::text
-                     )) AS section
-              FROM user_responses ur
-              JOIN questions q ON q.question_id = ur.question_id
-              WHERE ur.user_id = :uid
-            )
-            SELECT
-              AVG(CASE WHEN section = 'Awareness' THEN score_obtained END) AS awareness_score,
-              AVG(CASE WHEN section = 'Alignment / Time' THEN score_obtained END) AS time_alignment_score,
-              AVG(CASE WHEN section = 'Action' THEN score_obtained END) AS action_integrity_score
-            FROM base
-            """
-        )
-        agg = db.execute(agg_sql, {"uid": current_user.id}).mappings().first()
-        awareness = agg.get("awareness_score")
-        time_align = agg.get("time_alignment_score")
-        action = agg.get("action_integrity_score")
-        overall_parts = [v for v in [awareness, time_align, action] if v is not None]
-        overall = sum(overall_parts) / len(overall_parts) if overall_parts else None
-
-        insert_score = text(
-            """
-            INSERT INTO career_alignment_scores (user_id, awareness_score, time_alignment_score, action_integrity_score, overall_score, created_at, updated_at)
-            VALUES (:uid, :awareness, :time_align, :action, :overall, NOW(), NOW())
-            """
-        )
-        db.execute(
-            insert_score,
-            {
-                "uid": current_user.id,
-                "awareness": awareness,
-                "time_align": time_align,
-                "action": action,
-                "overall": overall,
-            },
-        )
-    except Exception as e:
-        # Don't block response saving if the summary insert fails
-        print(f"[career_alignment_scores] insert skipped: {e}")
+    # Let DB-side function handle per-category + overall aggregation (future categories auto-supported)
+    db.execute(text("SELECT sync_alignment(:uid)"), {"uid": current_user.id})
 
     db.commit()
-    return {"message": "Responses saved", "count": len(payload.answers)}
+    return {"message": "Responses saved", "count": answers_count}
 
 
 @router.get("/career/responses/latest")
@@ -138,14 +146,11 @@ def latest_responses(current_user: models.User = Depends(get_current_user), db: 
       ur.created_at,
       q.question_text,
       q.display_order,
-      CASE
-        WHEN jsonb_typeof(q.category_id) = 'object' THEN q.category_id->>'section'
-        ELSE q.category_id::text
-      END AS section,
-      sub.name AS subsection
+      s.name AS section,
+      NULL AS subsection
     FROM user_responses ur
-    JOIN questions q ON q.question_id = ur.question_id
-    LEFT JOIN subsections sub ON q.subcategory_id = sub.id
+    JOIN master_questions q ON q.question_id = ur.question_id
+    LEFT JOIN master_sections s ON q.section_id = s.id
     WHERE ur.user_id = :uid
     ORDER BY ur.created_at DESC, q.display_order ASC
     """
@@ -168,37 +173,22 @@ def reset_responses(current_user: models.User = Depends(get_current_user), db: S
 
 @router.get("/career/alignment/latest")
 def latest_alignment(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-  """Return the latest career alignment snapshot for the current user, or on-the-fly aggregation if none exists."""
-  latest_sql = text(
-    """
-    SELECT *
-    FROM career_alignment_scores
-    WHERE user_id = :uid
-    ORDER BY created_at DESC
-    LIMIT 1
-    """
-  )
-  row = db.execute(latest_sql, {"uid": current_user.id}).mappings().first()
-  if row:
-    return {"alignment": row}
-
-  # Fallback: aggregate from existing responses without inserting
+  """
+  Return the latest career alignment snapshot for the current user (computed on the fly).
+  """
   agg_sql = text(
     """
     WITH base AS (
       SELECT ur.score_obtained,
-             TRIM(BOTH '\"' FROM COALESCE(
-               CASE WHEN jsonb_typeof(q.category_id) = 'object' THEN q.category_id->>'section' END,
-               q.category_id::text
-             )) AS section
+             q.category_id
       FROM user_responses ur
-      JOIN questions q ON q.question_id = ur.question_id
+      JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid
     )
     SELECT
-      AVG(CASE WHEN section = 'Awareness' THEN score_obtained END) AS awareness_score,
-      AVG(CASE WHEN section = 'Alignment / Time' THEN score_obtained END) AS time_alignment_score,
-      AVG(CASE WHEN section = 'Action' THEN score_obtained END) AS action_integrity_score
+      AVG(CASE WHEN category_id = 1 THEN score_obtained END) AS awareness_score,
+      AVG(CASE WHEN category_id = 2 THEN score_obtained END) AS time_alignment_score,
+      AVG(CASE WHEN category_id = 3 THEN score_obtained END) AS action_integrity_score
     FROM base
     """
   )

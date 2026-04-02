@@ -21,5 +21,7 @@ from app.models.question import (
     QuestionUserTypeMap,
     UserType,
     Section,
-    Subsection,
+    Energy,
+    Element,
+    Category,
 )

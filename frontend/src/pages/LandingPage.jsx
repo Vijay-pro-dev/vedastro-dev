@@ -40,14 +40,6 @@ function LandingPage() {
   const activeLanguage = user?.language || landingLanguage
   const pageT = getTranslations(activeLanguage)
   const signupT = pageT
-  const hasQuestionnaireAnswers = () => {
-    try {
-      const stored = JSON.parse(localStorage.getItem("guest_questionnaire_answers") || "{}")
-      return stored && Object.keys(stored).length > 0
-    } catch {
-      return false
-    }
-  }
 
   const languageOptions = [
     { value: "english", label: "English (UK)" },
@@ -213,7 +205,6 @@ function LandingPage() {
   }
 
   const isAdmin = user?.role === "admin"
-  const primaryAction = isAdmin ? "admin-panel" : user?.profile_completed ? "dashboard" : "complete"
 
   return (
     <div className="landing">
@@ -437,28 +428,29 @@ function LandingPage() {
         </div>
       )}
 
-      <section className="hero">
+      <section className={`hero ${user ? "hero-logged-in" : "hero-default"}`}>
         <div className="overlay" />
         <div className="hero-content">
-          <h1>{pageT.heroTitle}</h1>
-          <p>{pageT.heroSub}</p>
-
           {!user && (
-            <div className="buttons">
-              <button
-                className="btn primary"
-                onClick={() => {
-                  setShowLanguageDropdown(false)
-                  navigate("/form")
-                }}
-              >
-                {pageT.startFreeAnalysis}
-              </button>
-            </div>
+            <>
+              <h1>{pageT.heroTitle}</h1>
+              <p>{pageT.heroSub}</p>
+              <div className="buttons hero-cta-row">
+                <button
+                  className="btn primary"
+                  onClick={() => {
+                    setShowLanguageDropdown(false)
+                    navigate("/form")
+                  }}
+                >
+                  {pageT.startFreeAnalysis}
+                </button>
+              </div>
+            </>
           )}
 
           {user && (
-            <div className="buttons">
+            <div className="hero-actions">
               <button
                 className="btn primary"
                 onClick={() => {

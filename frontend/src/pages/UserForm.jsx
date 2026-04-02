@@ -9,11 +9,35 @@ function UserForm() {
   const navigate = useNavigate()
   const { user, updateUser, t } = useUser()
   const { showError, showSuccess } = useToast()
+  const CITY_OPTIONS = [
+    "Mumbai",
+    "Delhi",
+    "Bengaluru",
+    "Hyderabad",
+    "Chennai",
+    "Kolkata",
+    "Pune",
+    "Ahmedabad",
+    "Jaipur",
+    "Lucknow",
+    "Chandigarh",
+    "Indore",
+    "Bhopal",
+    "Nagpur",
+    "Visakhapatnam",
+    "Surat",
+    "Patna",
+    "Ranchi",
+    "Coimbatore",
+    "Other",
+  ]
   const [currentStep, setCurrentStep] = useState(0)
   const [showQuestionnaire, setShowQuestionnaire] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(true)
+  const [countryCode, setCountryCode] = useState("+91")
+  const [timeParts, setTimeParts] = useState({ hour: "12", minute: "00", meridiem: "AM" })
 
   const [birthTimeKnowledge, setBirthTimeKnowledge] = useState("yes")
   const [formData, setFormData] = useState({
@@ -25,6 +49,7 @@ function UserForm() {
     birth_place: "",
     birth_time_accuracy: "exact",
   })
+  const [customCity, setCustomCity] = useState("")
   const [careerData, setCareerData] = useState({
     education: "",
     interests: "",
@@ -34,6 +59,72 @@ function UserForm() {
     goal_clarity: "medium",
     role_match: "medium",
   })
+  const MAX_NAME_WORDS = 60
+
+  const validateFullName = (value) => {
+    const trimmed = value.trim()
+    if (!trimmed) return { isValid: false, message: "Full name is required." }
+    if (trimmed.length < 4 || trimmed.length > 50) return { isValid: false, message: "Full name must be 4-50 characters." }
+    const words = trimmed.split(/\s+/)
+    if (words.length < 2) return { isValid: false, message: "Enter at least first and last name." }
+    if (words.some((w) => w.length < 2)) return { isValid: false, message: "Each name part must be at least 2 letters." }
+    if (!/^[A-Za-z]+( [A-Za-z]+)+$/.test(trimmed)) return { isValid: false, message: "Use letters only with single spaces; no numbers or symbols." }
+    if (words.length > MAX_NAME_WORDS) return { isValid: false, message: `Full name cannot exceed ${MAX_NAME_WORDS} words.` }
+    return { isValid: true, message: "Valid Full Name" }
+  }
+
+  const validateCurrentRole = (value) => {
+    const trimmed = value.trim()
+    if (trimmed.length < 2) return { isValid: false, message: "Current role must be at least 2 characters." }
+    if (trimmed.length > 50) return { isValid: false, message: "Current role must be at most 50 characters." }
+    if (!/^[A-Za-z&/ \-]+$/.test(trimmed)) return { isValid: false, message: "Use only letters, spaces, and & / - symbols." }
+    if (/^[^A-Za-z]*$/.test(trimmed)) return { isValid: false, message: "Current role must contain letters." }
+    if (/^[0-9 ]+$/.test(trimmed)) return { isValid: false, message: "Numbers-only role is not allowed." }
+    return { isValid: true, message: "Valid" }
+  }
+
+  const validateEducation = (value) => {
+    const trimmed = value.trim()
+    if (trimmed.length < 5) return { isValid: false, message: "Education must be at least 5 characters." }
+    if (trimmed.length > 100) return { isValid: false, message: "Education seems too long." }
+    if (!/^[A-Za-z., ]+$/.test(trimmed)) return { isValid: false, message: "Use letters, spaces, dots, and commas only." }
+    return { isValid: true, message: "Valid" }
+  }
+
+  const validateExperience = (value) => {
+    if (value === "" || value === null) return { isValid: false, message: "Experience is required." }
+    const num = Number(value)
+    if (!Number.isFinite(num)) return { isValid: false, message: "Experience must be a number." }
+    if (num < 0 || num > 50) return { isValid: false, message: "Experience must be between 0 and 50." }
+    return { isValid: true, message: "Valid" }
+  }
+
+  const validateInterests = (value) => {
+    const trimmed = value.trim()
+    if (trimmed.length < 3) return { isValid: false, message: "Interests must be at least 3 characters." }
+    if (trimmed.length > 200) return { isValid: false, message: "Interests must be under 200 characters." }
+    if (/^[0-9 ,]+$/.test(trimmed)) return { isValid: false, message: "Interests cannot be numbers only." }
+    return { isValid: true, message: "Valid" }
+  }
+
+  const validateGoals = (value) => {
+    const trimmed = value.trim()
+    if (trimmed.length < 10) return { isValid: false, message: "Goals must be at least 10 characters." }
+    if (trimmed.length > 300) return { isValid: false, message: "Goals must be under 300 characters." }
+    const lower = trimmed.toLowerCase()
+    if (["nothing", "idk", "none", "na"].includes(lower)) return { isValid: false, message: "Please enter a meaningful goal." }
+    if (/^[0-9 ]+$/.test(trimmed)) return { isValid: false, message: "Goals cannot be numbers only." }
+    return { isValid: true, message: "Valid" }
+  }
+
+  const validateAddress = (value) => {
+    const trimmed = value.trim()
+    if (trimmed.length < 10) return { isValid: false, message: "Address must be at least 10 characters." }
+    if (trimmed.length > 200) return { isValid: false, message: "Address must be under 200 characters." }
+    if (!/^[A-Za-z0-9 ,\/-]+$/.test(trimmed)) return { isValid: false, message: "Use letters, numbers, spaces, commas, hyphens, and slashes only." }
+    if (/^[0-9 ]+$/.test(trimmed)) return { isValid: false, message: "Address cannot be numbers only." }
+    return { isValid: true, message: "Valid" }
+  }
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -47,15 +138,59 @@ function UserForm() {
         const response = await api.get("/profile")
         const profile = response.data
 
+        // derive country code + local number if present
+        if (profile.phone) {
+          const phoneDigits = profile.phone.replace(/[^0-9+]/g, "")
+          const phoneMatch = phoneDigits.match(/^(\+?\d{1,3})?(\d{10,})$/)
+          if (phoneMatch) {
+            setCountryCode(phoneMatch[1] || "+91")
+            setFormData((prev) => ({ ...prev, phone: phoneMatch[2].slice(0, 10) }))
+          } else {
+            setFormData((prev) => ({ ...prev, phone: profile.phone }))
+          }
+        }
+
+        const deriveTimeParts = (timeStr) => {
+          if (!timeStr) return { hour: "12", minute: "00", meridiem: "AM" }
+          const parts = timeStr.trim().toLowerCase()
+          const match12 = parts.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)$/)
+          if (match12) {
+            return {
+              hour: String(Number(match12[1])).padStart(2, "0"),
+              minute: match12[2],
+              meridiem: match12[4].toUpperCase(),
+            }
+          }
+          const match24 = parts.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
+          if (match24) {
+            let h = Number(match24[1])
+            const meridiem = h >= 12 ? "PM" : "AM"
+            h = h % 12 || 12
+            return {
+              hour: String(h).padStart(2, "0"),
+              minute: match24[2],
+              meridiem,
+            }
+          }
+          return { hour: "12", minute: "00", meridiem: "AM" }
+        }
+
         setFormData({
           name: profile.name || "",
-          phone: profile.phone || "",
+          phone: profile.phone ? profile.phone.replace(/[^0-9]/g, "").slice(-10) : "",
           address: profile.address || "",
           dob: profile.dob || "",
           birth_time: profile.birth_time || "",
           birth_place: profile.birth_place || "",
           birth_time_accuracy: profile.birth_time_accuracy || "unknown",
         })
+        setTimeParts(deriveTimeParts(profile.birth_time))
+        if (profile.birth_place && !CITY_OPTIONS.includes(profile.birth_place)) {
+          setCustomCity(profile.birth_place)
+          setFormData((prev) => ({ ...prev, birth_place: "Other" }))
+        } else {
+          setCustomCity("")
+        }
         setCareerData({
           education: profile.education || "",
           interests: profile.interests || "",
@@ -82,27 +217,54 @@ function UserForm() {
 
   const validateBirthStep = () => {
     const nextErrors = {}
-    if (!formData.name.trim()) nextErrors.name = "Full name is required."
+    const nameCheck = validateFullName(formData.name)
+    if (!nameCheck.isValid) nextErrors.name = nameCheck.message
     if (!formData.phone.trim()) {
       nextErrors.phone = "Phone number is required."
-    } else if (!/^\d{10,15}$/.test(formData.phone.trim())) {
-      nextErrors.phone = "Phone number should contain 10 to 15 digits."
+    } else if (!/^\d{10}$/.test(formData.phone.trim())) {
+      nextErrors.phone = "Phone number should be exactly 10 digits."
     }
-    if (!formData.dob) nextErrors.dob = "Date of birth is required."
-    if (birthTimeKnowledge !== "no" && !formData.birth_time) nextErrors.birth_time = "Birth time is required."
-    if (!formData.birth_place.trim()) nextErrors.birth_place = "Birth place is required."
-    if (!formData.address.trim()) nextErrors.address = "Address is required."
+    if (!formData.dob) {
+      nextErrors.dob = "Date of birth is required."
+    } else if (new Date(formData.dob) > new Date()) {
+      nextErrors.dob = "Date of birth cannot be in the future."
+    }
+    const isValidBirthTime = (value) =>
+      /^([01]?\d|2[0-3]):[0-5]\d$/.test(value.trim())
+
+    if (birthTimeKnowledge !== "no" && !formData.birth_time) {
+      nextErrors.birth_time = "Birth time is required."
+    } else if (birthTimeKnowledge !== "no" && formData.birth_time && !isValidBirthTime(formData.birth_time)) {
+      nextErrors.birth_time = "Enter a valid time (HH:MM)"
+    }
+    if (!formData.birth_place.trim()) {
+      nextErrors.birth_place = "Birth place is required."
+    } else if (formData.birth_place === "Other" && !customCity.trim()) {
+      nextErrors.birth_place = "Please enter your city."
+    }
+    const addressCheck = validateAddress(formData.address || "")
+    if (!addressCheck.isValid) nextErrors.address = addressCheck.message
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
 
   const validateCareerStep = () => {
     const nextErrors = {}
-    if (!careerData.current_role.trim()) nextErrors.current_role = "Current role is required."
-    if (!careerData.education.trim()) nextErrors.education = "Education is required."
-    if (!careerData.interests.trim()) nextErrors.interests = "Interests are required."
-    if (!careerData.goals.trim()) nextErrors.goals = "Goals are required."
-    if (careerData.years_experience < 0) nextErrors.years_experience = "Experience cannot be negative."
+    const roleCheck = validateCurrentRole(careerData.current_role)
+    if (!roleCheck.isValid) nextErrors.current_role = roleCheck.message
+
+    const eduCheck = validateEducation(careerData.education)
+    if (!eduCheck.isValid) nextErrors.education = eduCheck.message
+
+    const expCheck = validateExperience(careerData.years_experience)
+    if (!expCheck.isValid) nextErrors.years_experience = expCheck.message
+
+    const interestCheck = validateInterests(careerData.interests)
+    if (!interestCheck.isValid) nextErrors.interests = interestCheck.message
+
+    const goalsCheck = validateGoals(careerData.goals)
+    if (!goalsCheck.isValid) nextErrors.goals = goalsCheck.message
+
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -126,17 +288,86 @@ function UserForm() {
 
   const handleFormChange = (event) => {
     const { name, value } = event.target
-    setFormData((current) => ({ ...current, [name]: value }))
+    if (name === "birth_place") {
+      setFormData((current) => ({ ...current, [name]: value }))
+      if (value !== "Other") {
+        setCustomCity("")
+      }
+    } else if (name === "phone") {
+      // keep only digits for local part
+      const digitsOnly = value.replace(/\D/g, "").slice(0, 10)
+      setFormData((current) => ({ ...current, [name]: digitsOnly }))
+    } else if (name === "name") {
+      const normalized = value.replace(/\s+/g, " ").trimStart()
+      const err = (() => {
+        const trimmed = normalized.trim()
+        if (!trimmed) return "Full name is required."
+        if (trimmed.length < 4 || trimmed.length > 50) return "Full name must be 4-50 characters."
+        const words = trimmed.split(/\s+/)
+        if (words.length < 2) return "Enter at least first and last name."
+        if (words.some((w) => w.length < 2)) return "Each name part must be at least 2 letters."
+        if (!/^[A-Za-z]+( [A-Za-z]+)+$/.test(trimmed)) return "Use letters only with single spaces; no numbers or symbols."
+        return ""
+      })()
+      // hard trim length to 50 to prevent overflow typing
+      const clipped = normalized.length > 50 ? normalized.slice(0, 50) : normalized
+      setFormData((current) => ({ ...current, [name]: clipped }))
+      setErrors((current) => ({ ...current, name: err }))
+    } else if (name === "address") {
+      const normalized = value.replace(/\s+/g, " ").trimStart()
+      const clipped = normalized.length > 200 ? normalized.slice(0, 200) : normalized
+      const check = validateAddress(clipped)
+      setFormData((current) => ({ ...current, address: clipped }))
+      setErrors((current) => ({ ...current, address: check.isValid ? "" : check.message }))
+    } else if (["birth_hour", "birth_minute", "birth_meridiem"].includes(name)) {
+      setTimeParts((current) => {
+        const updated = { ...current, [name.replace("birth_", "")]: value }
+        const hourNum = Number(updated.hour) % 12 || 12
+        const minuteNum = Number(updated.minute) % 60
+        const isPM = updated.meridiem === "PM"
+        const hour24 = (hourNum % 12) + (isPM ? 12 : 0)
+        const composed = `${String(hour24).padStart(2, "0")}:${String(minuteNum).padStart(2, "0")}`
+        setFormData((curr) => ({ ...curr, birth_time: composed }))
+        return updated
+      })
+    } else {
+      setFormData((current) => ({ ...current, [name]: value }))
+    }
     setErrors((current) => ({ ...current, [name]: "" }))
   }
 
   const handleCareerChange = (event) => {
     const { name, value } = event.target
+    const sanitized =
+      name === "years_experience"
+        ? value.replace(/[^\d.-]/g, "")
+        : value
+
     setCareerData((current) => ({
       ...current,
-      [name]: name === "years_experience" ? Number(value) : value,
+      [name]: name === "years_experience" ? (sanitized === "" ? "" : Number(sanitized)) : sanitized,
     }))
-    setErrors((current) => ({ ...current, [name]: "" }))
+
+    // run field-level validation
+    let err = ""
+    if (name === "current_role") {
+      const check = validateCurrentRole(sanitized)
+      if (!check.isValid) err = check.message
+    } else if (name === "education") {
+      const check = validateEducation(sanitized)
+      if (!check.isValid) err = check.message
+    } else if (name === "years_experience") {
+      const check = validateExperience(sanitized === "" ? "" : Number(sanitized))
+      if (!check.isValid) err = check.message
+    } else if (name === "interests") {
+      const check = validateInterests(sanitized.trim())
+      if (!check.isValid) err = check.message
+    } else if (name === "goals") {
+      const check = validateGoals(sanitized)
+      if (!check.isValid) err = check.message
+    }
+
+    setErrors((current) => ({ ...current, [name]: err }))
   }
 
   const handleSaveBirthData = async () => {
@@ -144,10 +375,15 @@ function UserForm() {
       showError("Please fix the highlighted personal profile fields.")
       return
     }
+    const birthPlaceValue = formData.birth_place === "Other" ? customCity.trim() : formData.birth_place
     const token = localStorage.getItem("token")
+    const phoneWithCode = `${countryCode}${formData.phone}`
     if (!token) {
       // guest flow: keep data locally and move ahead
-      localStorage.setItem("guest_profile_draft", JSON.stringify({ formData, careerData }))
+      localStorage.setItem(
+        "guest_profile_draft",
+        JSON.stringify({ formData: { ...formData, birth_place: birthPlaceValue, phone: phoneWithCode }, careerData })
+      )
       setCurrentStep(2)
       showSuccess("Profile saved locally. Create an account later to sync.")
       return
@@ -156,6 +392,8 @@ function UserForm() {
     try {
       const response = await api.put("/profile", {
         ...formData,
+        phone: phoneWithCode,
+        birth_place: birthPlaceValue,
       })
       updateUser(response.data)
       showSuccess("Personal profile saved successfully.")
@@ -172,17 +410,24 @@ function UserForm() {
       showError("Please fix the highlighted career profile fields.")
       return
     }
+    const birthPlaceValue = formData.birth_place === "Other" ? customCity.trim() : formData.birth_place
+    const phoneWithCode = `${countryCode}${formData.phone}`
     const token = localStorage.getItem("token")
     if (!token) {
-      localStorage.setItem("guest_profile_draft", JSON.stringify({ formData, careerData }))
+      localStorage.setItem(
+        "guest_profile_draft",
+        JSON.stringify({ formData: { ...formData, birth_place: birthPlaceValue, phone: phoneWithCode }, careerData })
+      )
       showSuccess("Profile saved locally. Sign up later to keep it in your account.")
-      navigate("/dashboard", { state: { guestProfile: { ...formData, ...careerData } } })
+      navigate("/dashboard", { state: { guestProfile: { ...formData, phone: phoneWithCode, birth_place: birthPlaceValue, ...careerData } } })
       return
     }
     setSaving(true)
     try {
       const response = await api.put("/profile", {
         ...formData,
+        phone: phoneWithCode,
+        birth_place: birthPlaceValue,
         ...careerData,
       })
       updateUser(response.data)
@@ -202,6 +447,10 @@ function UserForm() {
         onComplete={() => {
           setShowQuestionnaire(false)
           setCurrentStep(1)
+        }}
+        onClose={() => {
+          setShowQuestionnaire(false)
+          setCurrentStep(0)
         }}
       />
     )
@@ -223,6 +472,14 @@ function UserForm() {
     <div className="user-form-container">
       {currentStep === 0 && (
         <div className="form-card">
+          <button
+            type="button"
+            className="form-card-close"
+            aria-label="Close"
+            onClick={() => navigate(-1)}
+          >
+            ✕
+          </button>
           <h2>{t.birthTimeSetup}</h2>
           <p className="form-subtitle">{t.birthTimeSub}</p>
 
@@ -255,27 +512,120 @@ function UserForm() {
 
           <div className="input-group">
             <label>{t.phone}</label>
-            <input className={errors.phone ? "input-invalid" : ""} name="phone" value={formData.phone} onChange={handleFormChange} />
+            <div className="phone-row">
+              <select
+                className="country-code"
+                value={countryCode}
+                onChange={(e) => setCountryCode(e.target.value)}
+                aria-label="Country code"
+              >
+                <option value="+91">+91</option>
+                <option value="+1">+1</option>
+                <option value="+44">+44</option>
+                <option value="+61">+61</option>
+                <option value="+971">+971</option>
+              </select>
+              <input
+                className={errors.phone ? "input-invalid" : ""}
+                name="phone"
+                value={formData.phone}
+                onChange={handleFormChange}
+                placeholder="10-digit number"
+                inputMode="numeric"
+              />
+            </div>
             {errors.phone && <p className="field-error">{errors.phone}</p>}
           </div>
 
           <div className="input-group">
             <label>{t.dateOfBirth}</label>
-            <input className={errors.dob ? "input-invalid" : ""} type="date" name="dob" value={formData.dob} onChange={handleFormChange} />
+            <input
+              className={errors.dob ? "input-invalid" : ""}
+              type="date"
+              name="dob"
+              value={formData.dob}
+              max={new Date().toISOString().split("T")[0]}
+              onChange={handleFormChange}
+            />
             {errors.dob && <p className="field-error">{errors.dob}</p>}
           </div>
 
           {birthTimeKnowledge !== "no" && (
             <div className="input-group">
               <label>{t.birthTime}</label>
-              <input className={errors.birth_time ? "input-invalid" : ""} type="time" name="birth_time" value={formData.birth_time} onChange={handleFormChange} />
+              <div className="time-grid">
+                <select
+                  name="birth_hour"
+                  value={timeParts.hour}
+                  onChange={handleFormChange}
+                  aria-label="Hour"
+                >
+                  {[...Array(12)].map((_, i) => {
+                    const val = String((i + 1)).padStart(2, "0")
+                    return (
+                      <option key={val} value={val}>
+                        {val}
+                      </option>
+                    )
+                  })}
+                </select>
+                <span className="time-sep">:</span>
+                <select
+                  name="birth_minute"
+                  value={timeParts.minute}
+                  onChange={handleFormChange}
+                  aria-label="Minutes"
+                >
+                  {[...Array(60)].map((_, i) => {
+                    const val = String(i).padStart(2, "0")
+                    return (
+                      <option key={val} value={val}>
+                        {val}
+                      </option>
+                    )
+                  })}
+                </select>
+                <select
+                  name="birth_meridiem"
+                  value={timeParts.meridiem}
+                  onChange={handleFormChange}
+                  aria-label="AM or PM"
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+              </div>
               {errors.birth_time && <p className="field-error">{errors.birth_time}</p>}
             </div>
           )}
 
           <div className="input-group">
             <label>{t.birthPlace}</label>
-            <input className={errors.birth_place ? "input-invalid" : ""} name="birth_place" value={formData.birth_place} onChange={handleFormChange} />
+            <select
+              className={errors.birth_place ? "input-invalid" : ""}
+              name="birth_place"
+              value={formData.birth_place}
+              onChange={handleFormChange}
+            >
+              <option value="">Select your city</option>
+              {CITY_OPTIONS.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
+            {formData.birth_place === "Other" && (
+              <input
+                className={errors.birth_place ? "input-invalid" : ""}
+                name="custom_city"
+                placeholder="Enter your city"
+                value={customCity}
+                onChange={(e) => {
+                  setCustomCity(e.target.value)
+                  setErrors((curr) => ({ ...curr, birth_place: "" }))
+                }}
+              />
+            )}
             {errors.birth_place && <p className="field-error">{errors.birth_place}</p>}
           </div>
 

@@ -2,10 +2,14 @@ import axios from "axios"
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL
 const currentHost = typeof window !== "undefined" ? window.location.hostname : "127.0.0.1"
-// Vercel/production fallback: if no env value and we're not on localhost, hit the deployed API
 const defaultProdBase = "https://vedastro-dev.onrender.com"
-const apiHost = currentHost === "localhost" ? "localhost" : "127.0.0.1"
-const API_BASE_URL = envBaseUrl || (currentHost === "localhost" ? `http://${apiHost}:8000` : defaultProdBase)
+const defaultLocalBase = "http://localhost:8000"
+
+// Priority:
+// 1) Explicit env override
+// 2) If running on localhost, hit local API
+// 3) Otherwise, use hosted API
+const API_BASE_URL = envBaseUrl || (currentHost === "localhost" || currentHost === "127.0.0.1" ? defaultLocalBase : defaultProdBase)
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
