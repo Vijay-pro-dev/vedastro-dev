@@ -53,7 +53,7 @@ def _admin_user_or_404(db: Session, user_id: int):
     return user
 
 
-def _get_or_create_section(db: Session, name: str) -> models.Section:
+def _get_or_create_section(db: Session, name: str, create_if_missing: bool = True) -> models.Section:
     section = (
         db.query(models.Section)
         .filter(models.Section.name.ilike(name.strip()))
@@ -61,6 +61,8 @@ def _get_or_create_section(db: Session, name: str) -> models.Section:
     )
     if section:
         return section
+    if not create_if_missing:
+        raise HTTPException(status_code=400, detail=f"Section '{name}' not found. Please choose an existing section.")
     section = models.Section(name=name.strip(), display_order=1, is_active=True)
     db.add(section)
     db.commit()
@@ -87,8 +89,19 @@ def _category_id_by_name(db: Session, name: str | None) -> int | None:
     return cat.id if cat else None
 
 
+def _energy_id_by_name(db: Session, name: str | None) -> int | None:
+    if not name:
+        return None
+    rec = db.query(models.Energy).filter(models.Energy.name.ilike(name.strip())).first()
+    return rec.id if rec else None
+
+
 def _category_lookup(db: Session) -> dict[int, str]:
     return {c.id: c.category_name for c in db.query(models.Category).all()}
+
+
+def _energy_lookup(db: Session) -> dict[int, str]:
+    return {e.id: e.name for e in db.query(models.Energy).all()}
 
 
 def _serialize_question(question: models.Question, user_type_code: str | None = None, section_lookup: dict[int, str] | None = None) -> dict:
@@ -110,6 +123,7 @@ def _serialize_question(question: models.Question, user_type_code: str | None = 
     if getattr(question, "element_id", None):
         element = getattr(question, "element_id")
     category_id = getattr(question, "category_id", None)
+    energy_id = getattr(question, "energy_id", None)
     return {
         "id": question.id,
         "question_id": question.id,
@@ -122,6 +136,7 @@ def _serialize_question(question: models.Question, user_type_code: str | None = 
         "subsection": element,
         "section": section,
         "category_id": category_id,
+        "energy_id": energy_id,
         "user_type_code": user_type_code or "GENERAL",
         "created_at": question.created_at.isoformat() if question.created_at else None,
         "updated_at": question.updated_at.isoformat() if question.updated_at else None,
@@ -320,6 +335,7 @@ def list_questions(_: dict = Depends(get_current_admin), db: Session = Depends(g
     section_lookup = {s.id: s.name for s in db.query(models.Section).all()}
     element_lookup = {e.id: e.name for e in db.query(models.Element).all()}
     category_lookup = _category_lookup(db)
+    energy_lookup = _energy_lookup(db)
     rows = (
         db.query(models.Question, models.UserType.type_code)
         .join(models.QuestionUserTypeMap, models.Question.id == models.QuestionUserTypeMap.question_id, isouter=True)
@@ -329,9 +345,11 @@ def list_questions(_: dict = Depends(get_current_admin), db: Session = Depends(g
     )
     def serialize(q, code):
         elem_name = element_lookup.get(getattr(q, "element_id", None))
+        energy_name = energy_lookup.get(getattr(q, "energy_id", None))
         data = _serialize_question(q, code, section_lookup)
         data["element"] = elem_name
         data["category"] = category_lookup.get(getattr(q, "category_id", None))
+        data["energy"] = energy_name
         return data
     questions = [serialize(q, code) for q, code in rows]
     return {"questions": questions}
@@ -345,10 +363,10 @@ def create_question(
 ):
     """Create a new question and map it to a user type."""
     user_type = _user_type_by_code_or_404(db, payload.user_type_code)
-    section = _get_or_create_section(db, payload.section)
+    section = _get_or_create_section(db, payload.section, create_if_missing=False)
     element = db.query(models.Element).filter(models.Element.name.ilike((payload.subsection or "").strip())).first()
     category_id = _category_id_by_name(db, getattr(payload, "category", None)) or _category_id_by_name(db, payload.section)
-    category_id = _category_id_by_name(db, getattr(payload, "category", None)) or _category_id_by_name(db, payload.section)
+    energy_id = _energy_id_by_name(db, getattr(payload, "energy", None))
 
     question = models.Question(
         question_text=payload.question_text,
@@ -360,6 +378,7 @@ def create_question(
         section_id=section.id,
         element_id=element.id if element else None,
         category_id=category_id,
+        energy_id=energy_id,
         created_by=admin.get("id"),
         updated_by=admin.get("id"),
     )
@@ -372,9 +391,16 @@ def create_question(
     db.refresh(question)
     section_lookup = {section.id: section.name}
     element_lookup = {element.id: element.name} if element else {}
+    category_lookup = _category_lookup(db)
     data = _serialize_question(question, user_type.type_code, section_lookup)
     if element:
         data["element"] = element.name
+    if category_id:
+        data["category"] = category_lookup.get(category_id)
+    if energy_id:
+        energy = db.query(models.Energy).filter(models.Energy.id == energy_id).first()
+        if energy:
+            data["energy"] = energy.name
     return {"question": data}
 
 
@@ -391,8 +417,10 @@ def update_question(
         raise HTTPException(status_code=404, detail="Question not found")
 
     user_type = _user_type_by_code_or_404(db, payload.user_type_code)
-    section = _get_or_create_section(db, payload.section)
+    section = _get_or_create_section(db, payload.section, create_if_missing=False)
     element = db.query(models.Element).filter(models.Element.name.ilike((payload.subsection or "").strip())).first()
+    category_id = _category_id_by_name(db, getattr(payload, "category", None)) or _category_id_by_name(db, payload.section)
+    energy_id = _energy_id_by_name(db, getattr(payload, "energy", None))
 
     question.question_text = payload.question_text
     question.answer_type = payload.answer_type
@@ -403,6 +431,7 @@ def update_question(
     question.section_id = section.id
     question.element_id = element.id if element else None
     question.category_id = category_id
+    question.energy_id = energy_id
     question.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     question.updated_by = admin.get("id")
 
@@ -420,7 +449,18 @@ def update_question(
     db.commit()
     db.refresh(question)
     section_lookup = {section.id: section.name}
-    return {"question": _serialize_question(question, user_type.type_code, section_lookup)}
+    element_lookup = {element.id: element.name} if element else {}
+    data = _serialize_question(question, user_type.type_code, section_lookup)
+    if element:
+        data["element"] = element.name
+    category_lookup = _category_lookup(db)
+    if category_id:
+        data["category"] = category_lookup.get(category_id)
+    if energy_id:
+        energy = db.query(models.Energy).filter(models.Energy.id == energy_id).first()
+        if energy:
+            data["energy"] = energy.name
+    return {"question": data}
 
 
 @router.patch("/questions/{question_id}/status")
@@ -486,6 +526,17 @@ def list_sections(_: dict = Depends(get_current_admin), db: Session = Depends(ge
 def list_categories(_: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
     cats = db.query(models.Category).order_by(models.Category.id.asc()).all()
     return {"categories": [{"id": c.id, "name": c.category_name} for c in cats]}
+
+
+@router.get("/config/energy")
+def list_energy(_: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    rows = (
+        db.query(models.Energy)
+        .filter((models.Energy.is_active == True) | (models.Energy.is_active.is_(None)))  # noqa: E712
+        .order_by(models.Energy.display_order.asc().nulls_last(), models.Energy.id.asc())
+        .all()
+    )
+    return {"energy": [{"id": e.id, "name": e.name, "display_order": e.display_order, "is_active": e.is_active} for e in rows]}
 
 
 @router.post("/config/sections")

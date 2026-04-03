@@ -24,6 +24,12 @@ class QuestionBase(BaseModel):
         max_length=255,
         description="Category name (Awareness/Time/Action) from master_category",
     )
+    energy: Optional[str] = Field(
+        default=None,
+        min_length=0,
+        max_length=100,
+        description="Energy name from master_energy",
+    )
 
 
 class QuestionCreate(QuestionBase):

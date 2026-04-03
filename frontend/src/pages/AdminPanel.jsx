@@ -95,6 +95,7 @@ function AdminPanel() {
   const [editingQuestionId, setEditingQuestionId] = useState(null)
   const [sectionOptions, setSectionOptions] = useState([])
   const [subsectionOptions, setSubsectionOptions] = useState([])
+  const [energyOptions, setEnergyOptions] = useState([])
   const [showMenu, setShowMenu] = useState(false)
   const [newSection, setNewSection] = useState("")
   const [newElement, setNewElement] = useState("")
@@ -106,14 +107,16 @@ function AdminPanel() {
     is_required: true,
     is_active: true,
     user_type_code: "GENERAL",
-    section: "Awareness",
-    subsection: "Fire",
-    category: "Awareness",
+    section: "",
+    subsection: "",
+    category: "",
+    energy: "",
   })
 
   const activeSectionNames = sectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
   const activeSubsectionNames = subsectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
   const [categoryOptions, setCategoryOptions] = useState([])
+  const activeEnergyNames = energyOptions.filter((e) => e.is_active !== false).map((e) => e.name)
 
   const getAdminToken = () => localStorage.getItem("admin_token")
 
@@ -382,8 +385,10 @@ function AdminPanel() {
       is_required: true,
       is_active: true,
       user_type_code: "GENERAL",
-      section: "Awareness",
-      subsection: "Fire",
+      section: sectionOptions[0]?.name || "",
+      subsection: activeSubsectionNames[0] || "",
+      category: categoryOptions[0]?.name || "",
+      energy: activeEnergyNames[0] || "",
     })
     setEditingQuestionId(null)
   }
@@ -397,7 +402,14 @@ function AdminPanel() {
         subsection: questionForm.subsection,
         section: questionForm.section,
         category: questionForm.category,
+        energy: questionForm.energy,
       }
+    const normalizedSection = (payload.section || "").trim().toLowerCase()
+    const validSectionSet = new Set(sectionOptions.map((s) => (s.name || "").trim().toLowerCase()))
+    if (validSectionSet.size && !validSectionSet.has(normalizedSection)) {
+      showError("Please pick a valid section from the dropdown.")
+      return
+    }
     if (!payload.question_text.trim()) {
       showError("Question text is required.")
       return
@@ -452,9 +464,10 @@ function AdminPanel() {
       is_required: Boolean(question.is_required),
       is_active: Boolean(question.is_active),
       user_type_code: question.user_type_code || "GENERAL",
-      section: question.section || "Awareness",
-      subsection: question.subsection || "Fire",
-      category: question.category || "Awareness",
+      section: question.section || sectionOptions[0]?.name || "",
+      subsection: question.subsection || activeSubsectionNames[0] || "",
+      category: question.category || categoryOptions[0]?.name || "",
+      energy: question.energy || activeEnergyNames[0] || "",
     })
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -506,12 +519,24 @@ function AdminPanel() {
       api.get("/admin/config/element", { headers: { Authorization: `Bearer ${adminToken}` } }),
       api.get("/admin/config/categories", { headers: { Authorization: `Bearer ${adminToken}` } }),
     ])
+    const energyRes = await api
+      .get("/admin/config/energy", { headers: { Authorization: `Bearer ${adminToken}` } })
+      .catch(() => ({ data: { energy: [] } }))
       const sections = sectionsRes.data?.sections || []
       const subsections = subsectionsRes.data?.subsections || []
       const categories = categoriesRes.data?.categories || []
+      const energy = energyRes.data?.energy || []
       setSectionOptions(sections)
       setSubsectionOptions(subsections)
       setCategoryOptions(categories)
+      setEnergyOptions(energy)
+      setQuestionForm((curr) => ({
+        ...curr,
+        section: curr.section || sections[0]?.name || "",
+        subsection: curr.subsection || subsections[0]?.name || "",
+        category: curr.category || categories[0]?.name || "",
+        energy: curr.energy || energy[0]?.name || "",
+      }))
     } catch (error) {
       console.warn("Config load failed, using defaults", error)
     }
@@ -666,6 +691,12 @@ function AdminPanel() {
   useEffect(() => {
     setShowAllQuestions(false)
   }, [questionFilter])
+
+  useEffect(() => {
+    if (!questionForm.energy && activeEnergyNames.length) {
+      setQuestionForm((curr) => ({ ...curr, energy: activeEnergyNames[0] }))
+    }
+  }, [activeEnergyNames, questionForm.energy])
 
   const [activeSection, setActiveSection] = useState("dashboard")
 
@@ -1010,6 +1041,19 @@ function AdminPanel() {
                 </select>
               </label>
               <label>
+                <span>Energy</span>
+                <select
+                  value={questionForm.energy}
+                  onChange={(event) => setQuestionForm((current) => ({ ...current, energy: event.target.value }))}
+                >
+                  {activeEnergyNames.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
                 <span>Category</span>
                 <select
                   value={questionForm.category}
@@ -1127,6 +1171,7 @@ function AdminPanel() {
                       <span>User: {question.user_type_code || "GENERAL"}</span>
                       <span>Element: {question.subsection || "-"}</span>
                       <span>Category: {question.category || "-"}</span>
+                      <span>Energy: {question.energy || "-"}</span>
                       <span>{question.is_required ? "Required" : "Optional"}</span>
                     </div>
                   </div>
