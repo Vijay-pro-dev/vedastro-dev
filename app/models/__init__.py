@@ -5,6 +5,8 @@ from app.models.user import (
     BirthData,
     BirthTimeEstimate,
     CareerAlignmentScore,
+    ElementScore,
+    EnergyScore,
     CareerPhase,
     CareerProfile,
     CareerScore,
@@ -25,3 +27,5 @@ from app.models.question import (
     Element,
     Category,
 )
+
+from app.models.rule import MasterRule

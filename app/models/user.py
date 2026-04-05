@@ -104,6 +104,30 @@ class CareerAlignmentScore(Base):
     updated_at = Column(DateTime, default=utc_now)
 
 
+class ElementScore(Base):
+    __tablename__ = "element_score"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    element_id = Column(Integer, nullable=False)
+    score = Column(Integer, nullable=True)       # total/summed score for the element
+    avg_score = Column(Integer, nullable=True)   # averaged 0-100 score for the element
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now)
+
+
+class EnergyScore(Base):
+    __tablename__ = "energy_score"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    energy_id = Column(Integer, nullable=False)
+    score = Column(Integer, nullable=True)       # total/summed score for the energy
+    avg_score = Column(Integer, nullable=True)   # averaged 0-100 score for the energy
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now)
+
+
 class CareerPhase(Base):
     __tablename__ = "career_phases"
 

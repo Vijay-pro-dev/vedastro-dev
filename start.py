@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+import asyncio
 
 
 def run_migrations_if_enabled() -> None:
@@ -28,6 +29,12 @@ def run_migrations_if_enabled() -> None:
 
 def start_api() -> None:
     """Start the FastAPI app with or without reload based on the env settings."""
+    # On Windows the default ProactorEventLoop sometimes raises noisy
+    # ConnectionResetError callbacks when uvicorn shuts down sockets.
+    # Switching to the selector loop avoids the spurious traceback.
+    if sys.platform.startswith("win"):
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
     command = [
         sys.executable,
         "-m",

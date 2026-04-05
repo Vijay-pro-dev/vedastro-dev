@@ -205,9 +205,6 @@ color:#333;
 
 
 
-.global-reset {
-  /* placeholder to keep file structure consistent */
-}
 
 html,
 body {
@@ -5367,3 +5364,17 @@ background-clip: text;
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Rules form layout */
+.rules-grid { display: flex; flex-direction: column; gap: 14px; }
+.rules-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; }
+.rules-row.split { grid-template-columns: 180px 1fr 1fr; }
+.rules-row label { color: #e5e7eb; font-weight: 600; }
+.rules-row input, .rules-row textarea {
+  width: 100%; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+  color: #e5e7eb;
+}
+.rules-row textarea { min-height: 64px; resize: vertical; }
+@media (max-width: 900px) { .rules-row, .rules-row.split { grid-template-columns: 1fr; } }
+

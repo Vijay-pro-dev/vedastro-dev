@@ -112,6 +112,41 @@ function AdminPanel() {
     category: "",
     energy: "",
   })
+  const [ruleList, setRuleList] = useState([])
+  const [ruleLoading, setRuleLoading] = useState(false)
+  const [ruleError, setRuleError] = useState("")
+  const [editingRuleId, setEditingRuleId] = useState(null)
+  const [ruleForm, setRuleForm] = useState({
+    rule_name: "",
+    rule_type: "",
+    insight: "",
+    why: "",
+    action_energy_low: "",
+    action_energy_high: "",
+    clarity_energy_low: "",
+    clarity_energy_high: "",
+    emotional_energy_low: "",
+    emotional_energy_high: "",
+    opportunity_energy_low: "",
+    opportunity_energy_high: "",
+    fire_element_low: "",
+    fire_element_high: "",
+    earth_element_low: "",
+    earth_element_high: "",
+    air_element_low: "",
+    air_element_high: "",
+    water_element_low: "",
+    water_element_high: "",
+    space_element_low: "",
+    space_element_high: "",
+    section: "",
+    next_move: "",
+    alternative: "",
+    risk: "",
+    mistake: "",
+    priority: "",
+    customer_message: "",
+  })
 
   const activeSectionNames = sectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
   const activeSubsectionNames = subsectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
@@ -199,6 +234,158 @@ function AdminPanel() {
     loadConfigOptions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const resetRuleForm = () => {
+    setRuleForm({
+      rule_name: "",
+      rule_type: "",
+      insight: "",
+      why: "",
+      action_energy_low: "",
+      action_energy_high: "",
+      clarity_energy_low: "",
+      clarity_energy_high: "",
+      emotional_energy_low: "",
+      emotional_energy_high: "",
+      opportunity_energy_low: "",
+      opportunity_energy_high: "",
+      fire_element_low: "",
+      fire_element_high: "",
+      earth_element_low: "",
+      earth_element_high: "",
+      air_element_low: "",
+      air_element_high: "",
+      water_element_low: "",
+      water_element_high: "",
+      space_element_low: "",
+      space_element_high: "",
+      section: "",
+      next_move: "",
+      alternative: "",
+      risk: "",
+      mistake: "",
+      priority: "",
+      customer_message: "",
+    })
+    setEditingRuleId(null)
+  }
+
+  const loadRules = async () => {
+    setRuleLoading(true)
+    setRuleError("")
+    try {
+      const adminToken = getAdminToken()
+      const resp = await api.get("/admin/rules", { headers: { Authorization: `Bearer ${adminToken}` } })
+      setRuleList(resp.data?.rules || [])
+    } catch (err) {
+      setRuleError(getErrorMessage(err))
+      showError("Failed to load rules")
+    } finally {
+      setRuleLoading(false)
+    }
+  }
+
+  const handleRuleSubmit = async (event) => {
+    event.preventDefault()
+    setRuleLoading(true)
+    setRuleError("")
+
+    const errors = []
+    const checkText = (label, value, min, max, required = true) => {
+      const val = value ?? ""
+      if (!val.trim()) {
+        if (required) errors.push(`${label} is required`)
+        return
+      }
+      if (val.trim().length < min) errors.push(`${label} must be at least ${min} chars`)
+      if (val.trim().length > max) errors.push(`${label} must be at most ${max} chars`)
+    }
+    const checkOptionalText = (label, value, min, max) => {
+      const val = value ?? ""
+      if (!val.trim()) return
+      if (val.trim().length < min) errors.push(`${label} must be at least ${min} chars`)
+      if (val.trim().length > max) errors.push(`${label} must be at most ${max} chars`)
+    }
+    const checkRangePair = (label, low, high) => {
+      const hasLow = low !== "" && low !== null && low !== undefined
+      const hasHigh = high !== "" && high !== null && high !== undefined
+      if (!hasLow || !hasHigh) {
+        errors.push(`${label} min and max are required`)
+        return
+      }
+      const lowNum = Number(low)
+      const highNum = Number(high)
+      if (Number.isNaN(lowNum) || lowNum < 0 || lowNum > 500) errors.push(`${label} min must be 0-500`)
+      if (Number.isNaN(highNum) || highNum < 0 || highNum > 500) errors.push(`${label} max must be 0-500`)
+      if (!Number.isNaN(lowNum) && !Number.isNaN(highNum) && lowNum > highNum) errors.push(`${label} min cannot exceed max`)
+    }
+
+    checkText("Rule Name", ruleForm.rule_name, 3, 100)
+    checkText("Type", ruleForm.rule_type, 2, 50)
+    checkText("Insight", ruleForm.insight, 2, 500)
+    checkText("Why", ruleForm.why, 2, 500)
+    const checkNumber = (label, value) => {
+      if (value === "" || value === null || value === undefined) {
+        errors.push(`${label} is required`)
+        return
+      }
+      const num = Number(value)
+      if (Number.isNaN(num) || num < 0 || num > 500) {
+        errors.push(`${label} must be between 0 and 500`)
+      }
+    }
+    checkNumber("Section", ruleForm.section)
+    checkText("Next move", ruleForm.next_move, 5, 500)
+    checkOptionalText("Alternative", ruleForm.alternative, 5, 500)
+    checkOptionalText("Risk", ruleForm.risk, 5, 500)
+    checkOptionalText("Mistake", ruleForm.mistake, 5, 500)
+    checkText("Priority", ruleForm.priority, 3, 100)
+    checkOptionalText("Customer message", ruleForm.customer_message, 5, 500)
+
+    checkRangePair("Action Energy", ruleForm.action_energy_low, ruleForm.action_energy_high)
+    checkRangePair("Clarity Energy", ruleForm.clarity_energy_low, ruleForm.clarity_energy_high)
+    checkRangePair("Emotional Energy", ruleForm.emotional_energy_low, ruleForm.emotional_energy_high)
+    checkRangePair("Opportunity Energy", ruleForm.opportunity_energy_low, ruleForm.opportunity_energy_high)
+    checkRangePair("Fire", ruleForm.fire_element_low, ruleForm.fire_element_high)
+    checkRangePair("Earth", ruleForm.earth_element_low, ruleForm.earth_element_high)
+    checkRangePair("Air", ruleForm.air_element_low, ruleForm.air_element_high)
+    checkRangePair("Water", ruleForm.water_element_low, ruleForm.water_element_high)
+    checkRangePair("Space", ruleForm.space_element_low, ruleForm.space_element_high)
+
+    if (errors.length) {
+      const message = errors[0]
+      setRuleError(message)
+      showError(message)
+      setRuleLoading(false)
+      return
+    }
+
+    try {
+      const adminToken = getAdminToken()
+      const payload = { ...ruleForm }
+      Object.keys(payload).forEach((key) => {
+        if (payload[key] === "") payload[key] = null
+        if (typeof payload[key] === "string" && payload[key] !== null && /^\d+$/.test(payload[key])) {
+          payload[key] = Number(payload[key])
+        }
+      })
+      if (editingRuleId) {
+        const resp = await api.put(`/admin/rules/${editingRuleId}`, payload, { headers: { Authorization: `Bearer ${adminToken}` } })
+        setRuleList((prev) => prev.map((r) => (r.id === editingRuleId ? resp.data.rule : r)))
+        showSuccess("Rule updated")
+      } else {
+        const resp = await api.post("/admin/rules", payload, { headers: { Authorization: `Bearer ${adminToken}` } })
+        setRuleList((prev) => [...prev, resp.data.rule])
+        showSuccess("Rule saved")
+      }
+      resetRuleForm()
+    } catch (err) {
+      setRuleError(getErrorMessage(err))
+      showError("Failed to save rule")
+    } finally {
+      setRuleLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("admin_token")
@@ -694,8 +881,8 @@ function AdminPanel() {
 
   useEffect(() => {
     if (!questionForm.energy && activeEnergyNames.length) {
-      setQuestionForm((curr) => ({ ...curr, energy: activeEnergyNames[0] }))
-    }
+    setQuestionForm((curr) => ({ ...curr, energy: activeEnergyNames[0] }))
+  }
   }, [activeEnergyNames, questionForm.energy])
 
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -708,6 +895,9 @@ function AdminPanel() {
   const handleSectionSelect = (id) => {
     setActiveSection(id)
     setShowMenu(false)
+    if (id === "rules" && ruleList.length === 0 && !ruleLoading) {
+      loadRules()
+    }
     setTimeout(() => scrollToSection(id), 40)
   }
 
@@ -802,6 +992,10 @@ function AdminPanel() {
                 <span>Question Bank</span>
                 <span className="admin-menu-pill">Updated</span>
               </button>
+              <button className="admin-menu-item" onClick={() => handleSectionSelect("rules")}>
+                <span className="admin-menu-icon">📐</span>
+                <span>Rules</span>
+              </button>
             </div>
 
             <div className="admin-sidebar-footer">
@@ -817,7 +1011,7 @@ function AdminPanel() {
         <div className="admin-panel-header">
           <div>
             <h1>Admin Panel</h1>
-            <p>Project users, profile progress, activity logs, and dashboard-ready records.</p>
+          
           </div>
           <div className="admin-header-actions">
             <button className="auth-button admin-export-btn" onClick={handleExportCsv}>
@@ -984,7 +1178,7 @@ function AdminPanel() {
             <div>
               <h3>Question Bank (Admin only)</h3>
               <p className="admin-helper-text">
-                20-question model preloaded from Vedastro doc. Save calls /admin/questions; falls back to local seed when API is unavailable.
+                {/* 20-question model preloaded from Vedastro doc. Save calls /admin/questions; falls back to local seed when API is unavailable. */}
               </p>
             </div>
             <div className="admin-question-toolbar">
@@ -1199,6 +1393,182 @@ function AdminPanel() {
           )}
         </div>
         )}
+
+        {activeSection === "rules" && (
+  <div className="admin-panel-card" id="section-rules">
+    <div className="admin-table-header">
+      <div>
+        <h3>Rules</h3>
+        <p className="admin-helper-text">Create & update Rules entries.</p>
+      </div>
+      {ruleError && <span className="admin-helper-text danger">{ruleError}</span>}
+    </div>
+
+    <form className="admin-question-form" onSubmit={handleRuleSubmit}>
+      <div className="rules-grid">
+        <div className="rules-row">
+          <label>Rule Name</label>
+          <input required value={ruleForm.rule_name} onChange={(e) => setRuleForm({ ...ruleForm, rule_name: e.target.value })} />
+        </div>
+        <div className="rules-row">
+          <label>Type</label>
+          <input value={ruleForm.rule_type} onChange={(e) => setRuleForm({ ...ruleForm, rule_type: e.target.value })} />
+        </div>
+        <div className="rules-row">
+          <label>Insight</label>
+          <textarea value={ruleForm.insight} onChange={(e) => setRuleForm({ ...ruleForm, insight: e.target.value })} />
+        </div>
+        <div className="rules-row">
+          <label>Why</label>
+          <textarea value={ruleForm.why} onChange={(e) => setRuleForm({ ...ruleForm, why: e.target.value })} />
+        </div>
+
+        <div className="rules-row split">
+          <label>Action Energy</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.action_energy_low} onChange={(e) => setRuleForm({ ...ruleForm, action_energy_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.action_energy_high} onChange={(e) => setRuleForm({ ...ruleForm, action_energy_high: e.target.value })} />
+              </div>
+              <div className="rules-row split">
+                <label>Clarity Energy</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.clarity_energy_low} onChange={(e) => setRuleForm({ ...ruleForm, clarity_energy_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.clarity_energy_high} onChange={(e) => setRuleForm({ ...ruleForm, clarity_energy_high: e.target.value })} />
+              </div>
+              <div className="rules-row split">
+                <label>Emotional Energy</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.emotional_energy_low} onChange={(e) => setRuleForm({ ...ruleForm, emotional_energy_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.emotional_energy_high} onChange={(e) => setRuleForm({ ...ruleForm, emotional_energy_high: e.target.value })} />
+              </div>
+              <div className="rules-row split">
+                <label>Opportunity Energy</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.opportunity_energy_low} onChange={(e) => setRuleForm({ ...ruleForm, opportunity_energy_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.opportunity_energy_high} onChange={(e) => setRuleForm({ ...ruleForm, opportunity_energy_high: e.target.value })} />
+              </div>
+
+        <div className="rules-row split">
+          <label>Fire</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.fire_element_low} onChange={(e) => setRuleForm({ ...ruleForm, fire_element_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.fire_element_high} onChange={(e) => setRuleForm({ ...ruleForm, fire_element_high: e.target.value })} />
+              </div>
+              <div className="rules-row split">
+                <label>Earth</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.earth_element_low} onChange={(e) => setRuleForm({ ...ruleForm, earth_element_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.earth_element_high} onChange={(e) => setRuleForm({ ...ruleForm, earth_element_high: e.target.value })} />
+              </div>
+              <div className="rules-row split">
+                <label>Air</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.air_element_low} onChange={(e) => setRuleForm({ ...ruleForm, air_element_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.air_element_high} onChange={(e) => setRuleForm({ ...ruleForm, air_element_high: e.target.value })} />
+              </div>
+              <div className="rules-row split">
+                <label>Water</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.water_element_low} onChange={(e) => setRuleForm({ ...ruleForm, water_element_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.water_element_high} onChange={(e) => setRuleForm({ ...ruleForm, water_element_high: e.target.value })} />
+              </div>
+              <div className="rules-row split">
+                <label>Space</label>
+                <input required type="number" min="0" max="500" placeholder="min" value={ruleForm.space_element_low} onChange={(e) => setRuleForm({ ...ruleForm, space_element_low: e.target.value })} />
+                <input required type="number" min="0" max="500" placeholder="max" value={ruleForm.space_element_high} onChange={(e) => setRuleForm({ ...ruleForm, space_element_high: e.target.value })} />
+              </div>
+
+              <div className="rules-row">
+                <label>Section</label>
+                <input type="number" min="0" max="500" placeholder="Section" value={ruleForm.section} onChange={(e) => setRuleForm({ ...ruleForm, section: e.target.value })} />
+              </div>
+        <div className="rules-row"><label>Next move</label><textarea value={ruleForm.next_move} onChange={(e) => setRuleForm({ ...ruleForm, next_move: e.target.value })} /></div>
+        <div className="rules-row"><label>Alternative</label><textarea value={ruleForm.alternative} onChange={(e) => setRuleForm({ ...ruleForm, alternative: e.target.value })} /></div>
+        <div className="rules-row"><label>Risk</label><textarea value={ruleForm.risk} onChange={(e) => setRuleForm({ ...ruleForm, risk: e.target.value })} /></div>
+        <div className="rules-row"><label>Mistake</label><textarea value={ruleForm.mistake} onChange={(e) => setRuleForm({ ...ruleForm, mistake: e.target.value })} /></div>
+        <div className="rules-row"><label>Priority</label><textarea value={ruleForm.priority} onChange={(e) => setRuleForm({ ...ruleForm, priority: e.target.value })} /></div>
+        <div className="rules-row"><label>Customer message</label><textarea value={ruleForm.customer_message} onChange={(e) => setRuleForm({ ...ruleForm, customer_message: e.target.value })} /></div>
+      </div>
+      <div className="admin-question-actions center">
+        <button type="submit" className="admin-primary-btn" disabled={ruleLoading}>
+          {ruleLoading ? "Saving..." : "Save Rule"}
+        </button>
+        <button type="button" className="admin-action-btn ghost" onClick={resetRuleForm}>
+          Clear
+        </button>
+      </div>
+    </form>
+
+    <div className="admin-question-list">
+      {ruleLoading && ruleList.length === 0 && (
+        <div className="skeleton-card">
+          <div className="skeleton-line" />
+          <div className="skeleton-line" />
+          <div className="skeleton-line short" />
+        </div>
+      )}
+      {ruleList.map((rule) => (
+        <div key={rule.id} className="admin-question-item">
+          <p className="admin-question-text">{rule.rule_name}</p>
+          <div className="admin-question-meta">
+            <span className="pill dark">{rule.rule_type || "rule"}</span>
+            <span className="pill">{rule.section ?? "—"}</span>
+          </div>
+          {rule.insight && <p className="admin-helper-text">{rule.insight}</p>}
+          <div className="admin-question-actions">
+            <button
+              className="admin-action-btn"
+              onClick={() => {
+                setRuleForm({
+                  ...rule,
+                  action_energy_low: rule.action_energy_low ?? "",
+                  action_energy_high: rule.action_energy_high ?? "",
+                  clarity_energy_low: rule.clarity_energy_low ?? "",
+                  clarity_energy_high: rule.clarity_energy_high ?? "",
+                  emotional_energy_low: rule.emotional_energy_low ?? "",
+                  emotional_energy_high: rule.emotional_energy_high ?? "",
+                  opportunity_energy_low: rule.opportunity_energy_low ?? "",
+                  opportunity_energy_high: rule.opportunity_energy_high ?? "",
+                  fire_element_low: rule.fire_element_low ?? "",
+                  fire_element_high: rule.fire_element_high ?? "",
+                  earth_element_low: rule.earth_element_low ?? "",
+                  earth_element_high: rule.earth_element_high ?? "",
+                  air_element_low: rule.air_element_low ?? "",
+                  air_element_high: rule.air_element_high ?? "",
+                  water_element_low: rule.water_element_low ?? "",
+                  water_element_high: rule.water_element_high ?? "",
+                  space_element_low: rule.space_element_low ?? "",
+                  space_element_high: rule.space_element_high ?? "",
+                  section: rule.section ?? "",
+                  next_move: rule.next_move ?? "",
+                  alternative: rule.alternative ?? "",
+                  risk: rule.risk ?? "",
+                  mistake: rule.mistake ?? "",
+                  priority: rule.priority ?? "",
+                  customer_message: rule.customer_message ?? "",
+                })
+                setEditingRuleId(rule.id)
+                scrollToSection("section-rules")
+              }}
+            >
+              Edit
+            </button>
+            <button
+              className="admin-action-btn danger"
+              onClick={async () => {
+                try {
+                  const adminToken = getAdminToken()
+                  await api.delete(`/admin/rules/${rule.id}`, { headers: { Authorization: `Bearer ${adminToken}` } })
+                  setRuleList((prev) => prev.filter((r) => r.id !== rule.id))
+                  showSuccess("Rule deleted")
+                  if (editingRuleId === rule.id) resetRuleForm()
+                } catch (err) {
+                  showError(getErrorMessage(err))
+                }
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))}
+      {ruleList.length === 0 && !ruleLoading && <p className="admin-helper-text">No rules yet.</p>}
+    </div>
+  </div>
+  )}
+
 
         {activeSection === "config" && (
         <div className="admin-panel-card" id="section-config">

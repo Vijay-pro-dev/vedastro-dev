@@ -13,6 +13,8 @@ from services.auth.router import get_current_admin
 from app.schemas.admin import SuspendUserPayload, UpdateUserRolePayload
 from app.schemas.question import QuestionCreate, QuestionUpdate, QuestionToggleStatus
 from app.schemas.config import SectionCreate, SubsectionCreate
+from app.schemas.rule import RuleCreate, RuleOut
+from fastapi import HTTPException
 from app.services.activity_service import create_activity_log
 from app.services.profile_service import build_profile, get_latest_birth_data, get_latest_career_profile
 
@@ -606,6 +608,45 @@ def delete_element(sub_id: int, _: dict = Depends(get_current_admin), db: Sessio
     db.delete(elem)
     db.commit()
     return {"message": "Element deleted", "subsection_id": sub_id}
+
+
+# ---------- Rules management ----------
+
+@router.get("/rules", response_model=dict)
+def list_rules(_: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    rows = db.query(models.MasterRule).order_by(models.MasterRule.id.asc()).all()
+    return {"rules": [RuleOut.from_orm(r) for r in rows]}
+
+
+@router.post("/rules", response_model=dict)
+def create_rule(payload: RuleCreate, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    rule = models.MasterRule(**payload.dict())
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    return {"rule": RuleOut.from_orm(rule)}
+
+
+@router.put("/rules/{rule_id}", response_model=dict)
+def update_rule(rule_id: int, payload: RuleCreate, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    rule = db.query(models.MasterRule).filter(models.MasterRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    for key, value in payload.dict().items():
+        setattr(rule, key, value)
+    db.commit()
+    db.refresh(rule)
+    return {"rule": RuleOut.from_orm(rule)}
+
+
+@router.delete("/rules/{rule_id}", response_model=dict)
+def delete_rule(rule_id: int, _: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    rule = db.query(models.MasterRule).filter(models.MasterRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    db.delete(rule)
+    db.commit()
+    return {"message": "Rule deleted", "rule_id": rule_id}
 
 
 @router.get("/users/{user_id}")
