@@ -348,7 +348,7 @@ function Results() {
           <div className="card-header">
             <div>
               <h3>Alignment Snapshot</h3>
-              <p>Your clarity, timing, and execution scores derived from your inputs.</p>
+              <p>We’ve turned your answers into clarity, timing, and action scores.</p>
             </div>
             <div className="card-actions">
               <span className="pill dark">20 Questions</span>
