@@ -2,6 +2,19 @@ import { useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { api } from "../lib/api"
 
+const Icon = ({ d }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={d} />
+  </svg>
+)
+
+const ICONS = {
+  insight: "M12 2a9 9 0 0 0-5 16.44V21l3-1 3 1v-2.56A9 9 0 0 0 12 2Z",
+  action: "M5 12h14M12 5l7 7-7 7",
+  why: "M9 9a3 3 0 0 1 6 0c0 2-3 2-3 5M12 18h.01",
+  risk: "M12 3 3 19h18L12 3Zm0 8v3m0 3h.01",
+  mistake: "M9 9l6 6m0-6-6 6",
+}
 const getScoresFromDraft = (draft = {}) => {
   const required = ["name", "phone", "dob", "birth_place", "education", "interests", "goals", "current_role"]
   const filled = required.filter((f) => draft[f] && String(draft[f]).trim() !== "").length
@@ -27,6 +40,7 @@ function Results() {
   const [apiAnswers, setApiAnswers] = useState(null)
   const [apiQuestions, setApiQuestions] = useState(null)
   const [alignment, setAlignment] = useState(null)
+  const [rules, setRules] = useState([])
   const [retakeLoading, setRetakeLoading] = useState(false)
   const [showTop, setShowTop] = useState(false)
 
@@ -36,7 +50,11 @@ function Results() {
     if (!token) return
     const load = async () => {
       try {
-        const [respAlign, respResp] = await Promise.all([api.get("/career/alignment/latest"), api.get("/career/responses/latest")])
+        const [respAlign, respResp, respRules] = await Promise.all([
+          api.get("/career/alignment/latest"),
+          api.get("/career/responses/latest"),
+          api.get("/career/rules/latest"),
+        ])
 
         const alignRow = respAlign.data?.alignment
         if (alignRow && alignRow.overall_score != null) setAlignment(alignRow)
@@ -63,6 +81,7 @@ function Results() {
           category_id: row.section,
         }))
         setApiQuestions(qList)
+        setRules(respRules.data?.rules || [])
       } catch (err) {
         console.warn("Could not load responses from API, using local cache", err)
       }
@@ -179,18 +198,13 @@ function Results() {
     { name: "Space", desc: "Vision & Purpose", color: "#9b7bff", emoji: "✨" },
   ]
 
-  const completionPercent = useMemo(() => {
-    const totalQ = questionsList.length || 1
-    const answered = Object.keys(answers || {}).length
-    return Math.min(100, Math.round((answered / totalQ) * 100))
-  }, [answers, questionsList])
-
-  const whatsNext = [
-    "Save your profile to keep personalized guidance",
-    "Get your Energy & Element balance snapshot",
-    "See timing windows and action plan in dashboard",
-  ]
-
+  const topRules = useMemo(() => (rules || []).slice(0, 2), [rules])
+  const primaryRule = topRules[0]
+  const ruleInsight = primaryRule?.insight || primaryRule?.customer_message
+  const ruleAction = primaryRule?.next_move || primaryRule?.alternative || primaryRule?.customer_message
+  const ruleWhy = primaryRule?.why || primaryRule?.risk || primaryRule?.mistake || primaryRule?.customer_message
+  const ruleRisk = primaryRule?.risk
+  const ruleMistake = primaryRule?.mistake
   const insights = useMemo(() => {
     const out = []
     const fire = elementBreakdown.Fire ?? 0
@@ -416,36 +430,74 @@ function Results() {
         </div>
       </div>
 
-      <div className="results-grid">
-        <div className="card">
-          <h3>Insights</h3>
-          <ul className="insight-list">
-            {insights.slice(0, 6).map((line, idx) => (
-              <li key={idx}>{line}</li>
-            ))}
-          </ul>
+      <div className="results-grid two-col-rule">
+        <div className="left-stack">
+          <div className="card wide">
+            <div className="card-header">
+              <h3>Top Rule Matches</h3>
+              <span className="pill dark">{topRules.length} matched</span>
+            </div>
+            <div className="rule-grid">
+              {topRules.length ? (
+                topRules.map((rule, idx) => (
+                  <div className="rule-box" key={rule.id || idx}>
+                    <div className="rule-box-head">
+                      <span className="rule-name">{rule.rule_name || "Rule"}</span>
+                      {rule.priority && <span className="rule-badge">{rule.priority}</span>}
+                      {!rule.priority && (idx === 0 ? <span className="rule-badge">Top</span> : <span className="rule-badge subtle">Match</span>)}
+                    </div>
+                    <p className="rule-text">{rule.customer_message || rule.insight || "No description available."}</p>
+                    <div className="rule-meta">
+                      {rule.rule_type && <span className="rule-tag">{rule.rule_type}</span>}
+                      {rule.risk && <span className="rule-tag alert">{rule.risk}</span>}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="subtle">No matching rules yet.</p>
+              )}
+            </div>
+          </div>
+          <div className="card">
+            <h3><span className="card-icon"><Icon d={ICONS.insight} /></span> Insights</h3>
+            <ul className="insight-list">
+              {(ruleInsight ? [ruleInsight, ...(insights || [])] : insights).slice(0, 6).map((line, idx) => (
+                <li key={idx}>{line}</li>
+              ))}
+              {!ruleInsight && !insights.length && <li className="subtle">No insights yet.</li>}
+            </ul>
+          </div>
         </div>
-        <div className="card">
-          <h3>Next Move</h3>
-          <p><strong>{nextMove.nextMove}</strong></p>
-          <p>Why: {nextMove.why}</p>
-          <p>Action: {nextMove.action}</p>
-          <p>Avoid: {nextMove.avoid}</p>
-          <p>Opportunity: {nextMove.opportunity}</p>
-        </div>
-      </div>
-
-      <div className="results-grid tertiary">
-        <div className="card">
-          <h3>What's Next?</h3>
-          <ul className="next-list">
-            {whatsNext.map((item, idx) => (
-              <li key={idx} className="next-item">
-                <span className="next-bullet">{idx + 1}</span>
-                <span>{item}</span>
+        <div className="action-stack">
+          <div className="card">
+            <h3><span className="card-icon"><Icon d={ICONS.action} /></span> Action</h3>
+            <p><strong>{ruleAction || nextMove.action || "Stay consistent with one focused action daily."}</strong></p>
+          </div>
+          <div className="card">
+            <h3><span className="card-icon"><Icon d={ICONS.why} /></span> Why</h3>
+            <p>{ruleWhy || "No why provided for this rule."}</p>
+          </div>
+          <div className="card">
+            <h3><span className="card-icon"><Icon d={ICONS.risk} /></span> Risk</h3>
+            <p>{ruleRisk || "No risk noted for this rule."}</p>
+          </div>
+          <div className="card">
+            <h3><span className="card-icon"><Icon d={ICONS.mistake} /></span> Mistake</h3>
+            <p>{ruleMistake || "No common mistake captured yet."}</p>
+          </div>
+          <div className="card feedback-card">
+            <div className="feedback-header">
+              <span className="card-icon"><Icon d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Z" /></span>
+              <h3>Feedback</h3>
+            </div>
+            <ul className="todo-list">
+              <li>
+                <input type="checkbox" id="todo-action" />
+                <label htmlFor="todo-action">{ruleAction || "Complete today’s priority action."}</label>
               </li>
-            ))}
-          </ul>
+            </ul>
+            <button type="button" className="fb-submit">Submit</button>
+          </div>
         </div>
       </div>
 
@@ -459,3 +511,5 @@ function Results() {
 }
 
 export default Results
+
+

@@ -70,7 +70,7 @@ def list_career_questions(
         )
         rows = db.execute(sql).mappings().all()
 
-    return {"questions": rows}
+    return {"questions": [dict(r) for r in rows]}
 
 
 @router.get("/career/dashboard")
@@ -156,7 +156,7 @@ def latest_responses(current_user: models.User = Depends(get_current_user), db: 
     """
   )
   rows = db.execute(sql, {"uid": current_user.id}).mappings().all()
-  return {"responses": rows}
+  return {"responses": [dict(r) for r in rows]}
 
 
 @router.api_route("/career/responses/reset", methods=["POST", "GET"])
@@ -207,3 +207,83 @@ def latest_alignment(current_user: models.User = Depends(get_current_user), db: 
       "overall_score": overall,
     }
   }
+
+
+@router.get("/career/rules/latest", response_model=dict)
+def latest_rules(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+  sql = text(
+    """
+    WITH element_scores AS (
+      SELECT
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'fire'  THEN es.avg_score END), 0) AS fire,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'earth' THEN es.avg_score END), 0) AS earth,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'air'   THEN es.avg_score END), 0) AS air,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'water' THEN es.avg_score END), 0) AS water,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'space' THEN es.avg_score END), 0) AS space
+      FROM element_score es
+      JOIN master_element me ON me.id = es.element_id
+      WHERE es.user_id = :uid
+    ),
+    energy_scores AS (
+      SELECT
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'action'      THEN es.avg_score END), 0) AS action,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'clarity'     THEN es.avg_score END), 0) AS clarity,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'emotional'   THEN es.avg_score END), 0) AS emotional,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'opportunity' THEN es.avg_score END), 0) AS opportunity
+      FROM energy_score es
+      JOIN master_energy en ON en.id = es.energy_id
+      WHERE es.user_id = :uid
+    )
+    SELECT r.*
+    FROM master_rule r
+    CROSS JOIN element_scores e
+    CROSS JOIN energy_scores n
+    WHERE
+      e.fire BETWEEN r.fire_element_low AND r.fire_element_high
+      AND e.earth BETWEEN r.earth_element_low AND r.earth_element_high
+      AND e.air BETWEEN r.air_element_low AND r.air_element_high
+      AND e.water BETWEEN r.water_element_low AND r.water_element_high
+      AND e.space BETWEEN r.space_element_low AND r.space_element_high
+      AND n.action BETWEEN r.action_energy_low AND r.action_energy_high
+      AND n.clarity BETWEEN r.clarity_energy_low AND r.clarity_energy_high
+      AND n.emotional BETWEEN r.emotional_energy_low AND r.emotional_energy_high
+      AND n.opportunity BETWEEN r.opportunity_energy_low AND r.opportunity_energy_high
+    ORDER BY r.priority, r.id
+    """
+  )
+  rows = db.execute(sql, {"uid": current_user.id}).mappings().all()
+
+  score_sql = text(
+    """
+    WITH element_scores AS (
+      SELECT
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'fire'  THEN es.avg_score END), 0) AS fire,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'earth' THEN es.avg_score END), 0) AS earth,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'air'   THEN es.avg_score END), 0) AS air,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'water' THEN es.avg_score END), 0) AS water,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'space' THEN es.avg_score END), 0) AS space
+      FROM element_score es
+      JOIN master_element me ON me.id = es.element_id
+      WHERE es.user_id = :uid
+    ),
+    energy_scores AS (
+      SELECT
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'action'      THEN es.avg_score END), 0) AS action,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'clarity'     THEN es.avg_score END), 0) AS clarity,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'emotional'   THEN es.avg_score END), 0) AS emotional,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'opportunity' THEN es.avg_score END), 0) AS opportunity
+      FROM energy_score es
+      JOIN master_energy en ON en.id = es.energy_id
+      WHERE es.user_id = :uid
+    )
+    SELECT e.fire, e.earth, e.air, e.water, e.space,
+           n.action, n.clarity, n.emotional, n.opportunity
+    FROM element_scores e
+    CROSS JOIN energy_scores n
+    """
+  )
+  score_row = db.execute(score_sql, {"uid": current_user.id}).mappings().first()
+  # pydantic/fastapi cannot serialize RowMapping; convert to plain dicts
+  rules = [dict(r) for r in rows]
+  scores = dict(score_row) if score_row else {}
+  return {"rules": rules, "scores": scores}
