@@ -41,10 +41,13 @@ def list_career_questions(
               q.is_required,
               q.is_active,
               q.display_order,
-              s.name AS section
+              s.name AS section,
+              me.name AS subsection,
+              q.element_id AS element_id
             FROM master_questions q
             JOIN question_user_type_map map ON map.question_id = q.question_id
             LEFT JOIN master_sections s ON q.section_id = s.id
+            LEFT JOIN master_element me ON q.element_id = me.id
             WHERE map.user_type_id = :uid AND (q.is_active IS NULL OR q.is_active = TRUE)
             ORDER BY COALESCE(q.display_order, 0), q.question_id
             """
@@ -61,9 +64,12 @@ def list_career_questions(
               q.is_required,
               q.is_active,
               q.display_order,
-              s.name AS section
+              s.name AS section,
+              me.name AS subsection,
+              q.element_id AS element_id
             FROM master_questions q
             LEFT JOIN master_sections s ON q.section_id = s.id
+            LEFT JOIN master_element me ON q.element_id = me.id
             WHERE (q.is_active IS NULL OR q.is_active = TRUE)
             ORDER BY COALESCE(q.display_order, 0), q.question_id
             """

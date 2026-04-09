@@ -162,10 +162,27 @@ function Questionnaire() {
   const currentId = currentQuestion?.id || currentQuestion?.question_id
   const progressText = `${currentIdx + 1} / ${questions.length}`
   const selected = answers[currentId]
+  const elementName = (currentQuestion?.subsection || currentQuestion?.element || "").trim()
+  const elementId = currentQuestion?.element_id || currentQuestion?.elementId
+  const elementKey = (() => {
+    if (elementName) return elementName.toLowerCase()
+    const idMap = { 1: "fire", 2: "earth", 3: "air", 4: "water", 5: "space" }
+    return idMap[elementId] || ""
+  })()
+  const elementTheme = (() => {
+    const map = {
+      fire: { label: "Fire", bg: "linear-gradient(135deg, #ff6a00, #ff9248)", fg: "#fff" },
+      earth: { label: "Earth", bg: "linear-gradient(135deg, #4caf50, #7bc043)", fg: "#0b1b0b" },
+      air: { label: "Air", bg: "linear-gradient(135deg, #22d3ee, #6dd5ed)", fg: "#052b33" },
+      water: { label: "Water", bg: "linear-gradient(135deg, #3f87ff, #22b1ff)", fg: "#041a33" },
+      space: { label: "Space", bg: "linear-gradient(135deg, #9b7bff, #c7a9ff)", fg: "#1a1333" },
+    }
+    return map[elementKey] || null
+  })()
 
   return (
     <div className="questionnaire-shell">
-      <div className="question-window">
+      <div className={`question-window ${elementKey ? `element-${elementKey}` : ""}`}>
         <div className="window-bar">
           <button className="window-back" type="button" onClick={() => navigate(-1)} aria-label="Go back">
             ←

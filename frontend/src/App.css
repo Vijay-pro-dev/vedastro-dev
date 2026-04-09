@@ -2921,6 +2921,32 @@ align-items:center;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
 }
+/* Element theme highlight for questionnaire */
+.question-window.element-fire {
+  outline: 2px solid rgba(255,106,0,0.55);
+  outline-offset: -2px;
+  box-shadow: 0 12px 36px rgba(255,106,0,0.22);
+}
+.question-window.element-earth {
+  outline: 2px solid rgba(76,175,80,0.55);
+  outline-offset: -2px;
+  box-shadow: 0 12px 36px rgba(76,175,80,0.22);
+}
+.question-window.element-air {
+  outline: 2px solid rgba(34,211,238,0.55);
+  outline-offset: -2px;
+  box-shadow: 0 12px 36px rgba(34,211,238,0.22);
+}
+.question-window.element-water {
+  outline: 2px solid rgba(63,135,255,0.55);
+  outline-offset: -2px;
+  box-shadow: 0 12px 36px rgba(63,135,255,0.22);
+}
+.question-window.element-space {
+  outline: 2px solid rgba(155,123,255,0.55);
+  outline-offset: -2px;
+  box-shadow: 0 12px 36px rgba(155,123,255,0.22);
+}
 
 .qa-answers.centered {
   justify-content: center;

@@ -205,40 +205,7 @@ function Results() {
   const ruleWhy = primaryRule?.why || primaryRule?.risk || primaryRule?.mistake || primaryRule?.customer_message
   const ruleRisk = primaryRule?.risk
   const ruleMistake = primaryRule?.mistake
-  const insights = useMemo(() => {
-    const out = []
-    const fire = elementBreakdown.Fire ?? 0
-    const earth = elementBreakdown.Earth ?? 0
-    const air = elementBreakdown.Air ?? 0
-    const water = elementBreakdown.Water ?? 0
-    const space = elementBreakdown.Space ?? 0
-
-    if (fire > 70) out.push("Strong action taker")
-    else if (fire < 40) out.push("Low execution — build action muscle")
-
-    if (earth > 70) out.push("Highly consistent")
-    else if (earth < 50) out.push("Inconsistent habits (big issue)")
-
-    if (air > 70) out.push("Clear thinking and direction")
-    else if (air < 50) out.push("Confused direction — regain clarity")
-
-    if (space > 70) out.push("Opportunity aligned")
-    else if (space < 50) out.push("Wrong timing / low exposure")
-
-    if (fire > 70 && earth < 50) out.push("Starts fast but doesn’t stay consistent")
-    if (air < 50 && water > 70) out.push("Confused and overthinking decisions")
-    if (space > 70 && fire > 70) out.push("Strong growth window — act now")
-    if (space > 70 && fire < 50) out.push("Opportunity is present but action is low")
-
-    // Case logic
-    if (air < 50 && water < 50) out.push("Confused & emotionally stuck")
-    if (air > 70 && fire < 50) out.push("Knows what to do but not executing")
-    if (fire > 70 && space > 70) out.push("Strong growth phase")
-    if (space > 70 && fire < 50) out.push("Missing a big opportunity window")
-    if (fire > 70 && water < 50) out.push("Acting but decisions may be unstable")
-
-    return out
-  }, [elementBreakdown])
+  const insights = []
 
   const nextMove = useMemo(() => {
     const entries = Object.entries(elementBreakdown)
@@ -461,10 +428,10 @@ function Results() {
           <div className="card">
             <h3><span className="card-icon"><Icon d={ICONS.insight} /></span> Insights</h3>
             <ul className="insight-list">
-              {(ruleInsight ? [ruleInsight, ...(insights || [])] : insights).slice(0, 6).map((line, idx) => (
-                <li key={idx}>{line}</li>
-              ))}
-              {!ruleInsight && !insights.length && <li className="subtle">No insights yet.</li>}
+            {(ruleInsight ? [ruleInsight, ...insights] : insights).slice(0, 6).map((line, idx) => (
+              <li key={idx}>{line}</li>
+            ))}
+            {!ruleInsight && !insights.length && <li className="subtle">No insights yet.</li>}
             </ul>
           </div>
         </div>
