@@ -919,7 +919,7 @@ function AdminPanel() {
   const topRoles = Object.entries(stats.top_roles || {})
   const nationalityChartData = Object.entries(stats.top_nationalities || {}).map(([name, value]) => ({ name, value }))
   const languageChartData = Object.entries(stats.top_languages || {}).map(([name, value]) => ({ name, value }))
-  const pendingSuggestionCount = suggestionList.filter((item) => item.status === "pending").length
+  const suggestionBadgeCount = suggestionList.length
 
   useEffect(() => {
     setCurrentUserPage(1)
@@ -1035,7 +1035,7 @@ function AdminPanel() {
               <button className="admin-menu-item" onClick={() => handleSectionSelect("suggestions")}>
                 <span className="admin-menu-icon">💡</span>
                 <span>Suggestions</span>
-                <span className="admin-menu-badge">{pendingSuggestionCount}</span>
+                <span className="admin-menu-badge">{suggestionBadgeCount}</span>
               </button>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("activity")}>
                 <span className="admin-menu-icon">🗒️</span>
