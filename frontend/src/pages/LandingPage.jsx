@@ -23,6 +23,11 @@ function LandingPage() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
+  const [suggestionText, setSuggestionText] = useState("")
+  const [suggestions, setSuggestions] = useState([])
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [suggestionsError, setSuggestionsError] = useState("")
+  const [suggestionSending, setSuggestionSending] = useState(false)
   const [showLoginResetFields, setShowLoginResetFields] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [landingLanguage, setLandingLanguage] = useState(() => localStorage.getItem("landing_language") || "english")
@@ -37,6 +42,7 @@ function LandingPage() {
   const [resetToken, setResetToken] = useState("")
   const [resetPassword, setResetPassword] = useState("")
   const languageMenuRef = useRef(null)
+  const profileMenuRef = useRef(null)
   const activeLanguage = user?.language || landingLanguage
   const pageT = getTranslations(activeLanguage)
   const signupT = pageT
@@ -82,13 +88,59 @@ function LandingPage() {
       if (languageMenuRef.current && !languageMenuRef.current.contains(event.target)) {
         setShowLanguageDropdown(false)
       }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileDropdown(false)
+      }
     }
 
     document.addEventListener("mousedown", handleOutsideClick)
     return () => document.removeEventListener("mousedown", handleOutsideClick)
   }, [])
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setShowLanguageDropdown(false)
+        setShowProfileDropdown(false)
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+
+  const loadMySuggestions = async () => {
+    if (!user) return
+    setSuggestionsLoading(true)
+    setSuggestionsError("")
+    try {
+      const response = await api.get("/suggestions")
+      setSuggestions(response.data?.suggestions || [])
+    } catch (requestError) {
+      setSuggestionsError(requestError.response?.data?.detail || "Could not load suggestions.")
+    } finally {
+      setSuggestionsLoading(false)
+    }
+  }
+
+  const handleSendSuggestion = async () => {
+    const message = suggestionText.trim()
+    if (!message) return
+
+    setSuggestionSending(true)
+    setSuggestionsError("")
+    try {
+      const response = await api.post("/suggestions", { message })
+      setSuggestions((current) => [response.data, ...current].slice(0, 20))
+      setSuggestionText("")
+    } catch (requestError) {
+      setSuggestionsError(requestError.response?.data?.detail || "Could not send suggestion.")
+    } finally {
+      setSuggestionSending(false)
+    }
+  }
 
   const validatePassword = (password) => {
     if (password.length < 8) {
@@ -204,7 +256,15 @@ function LandingPage() {
     }
   }
 
-  const isAdmin = user?.role === "admin"
+  const role = (user?.role || "").toString().trim().toLowerCase()
+  const storedAdmin = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("admin_user") || "null")
+    } catch {
+      return null
+    }
+  })()
+  const isAdmin = role === "admin" || (storedAdmin?.role || "").toString().trim().toLowerCase() === "admin"
 
   return (
     <div className="landing">
@@ -235,12 +295,18 @@ function LandingPage() {
           </div>
 
           {user ? (
-            <div className="profile-menu">
+            <div className="profile-menu" ref={profileMenuRef}>
               <button
                 type="button"
                 className="profile-btn"
+                aria-haspopup="menu"
+                aria-expanded={showProfileDropdown}
+                aria-controls="profile-dropdown-menu"
                 onClick={() => {
                   setShowLanguageDropdown(false)
+                  if (!showProfileDropdown) {
+                    loadMySuggestions()
+                  }
                   setShowProfileDropdown((value) => !value)
                 }}
               >
@@ -248,26 +314,65 @@ function LandingPage() {
               </button>
 
               {showProfileDropdown && (
-                <div className="profile-dropdown">
-                  <div className="dropdown-item">
+                <div className="profile-dropdown" id="profile-dropdown-menu" role="menu" aria-label="Profile menu">
+                  <div className="dropdown-user">
                     <strong>{user.name || user.email?.split("@")[0]}</strong>
                     <span>{user.profile_completed ? pageT.dashboardReady : pageT.profilePending}</span>
                   </div>
-                  <button type="button" className="dropdown-action" onClick={() => navigate("/profile")}>
-                    {pageT.profile}
-                  </button>
-                  <button
-                    type="button"
-                    className="dropdown-action"
-                    onClick={() => {
-                      navigate(isAdmin ? "/admin-panel" : "/dashboard")
-                    }}
-                  >
-                    {isAdmin ? "Admin Panel" : pageT.dashboard}
-                  </button>
+                  <div className="dropdown-divider" aria-hidden="true" />
+                  <div className="dropdown-suggestions">
+                    <div className="suggestion-title">Suggestions</div>
+                    <textarea
+                      id="suggestion-box"
+                      className="suggestion-textarea"
+                      rows={3}
+                      placeholder="Tell us what to improve..."
+                      value={suggestionText}
+                      onChange={(e) => setSuggestionText(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <button
+                      type="button"
+                      className="suggestion-send"
+                      disabled={suggestionSending || !suggestionText.trim()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSendSuggestion()
+                      }}
+                    >
+                      {suggestionSending ? "Sending..." : "Send"}
+                    </button>
+
+                    {suggestionsError && <div className="suggestions-hint error">{suggestionsError}</div>}
+
+                    {suggestionsLoading ? (
+                      <div className="suggestions-hint">Loading your suggestions…</div>
+                    ) : suggestions.length ? (
+                      <div className="suggestions-list" onClick={(e) => e.stopPropagation()}>
+                        {suggestions.slice(0, 3).map((item) => (
+                          <div key={item.id} className="suggestion-item">
+                            <div className="suggestion-meta">
+                              <span className={`suggestion-status ${item.status === "resolved" ? "resolved" : "pending"}`}>
+                                {item.status === "resolved" ? "Done" : "Pending"}
+                              </span>
+                              <span className="suggestion-date">
+                                {item.created_at ? new Date(item.created_at).toLocaleDateString() : ""}
+                              </span>
+                            </div>
+                            <div className="suggestion-message">{item.message}</div>
+                            {item.admin_response && <div className="suggestion-admin">Admin: {item.admin_response}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="suggestions-hint">No suggestions yet.</div>
+                    )}
+                  </div>
+                  <div className="dropdown-divider" aria-hidden="true" />
                   <button
                     type="button"
                     className="dropdown-action dropdown-action-danger"
+                    role="menuitem"
                     onClick={() => {
                       logoutUser()
                       setShowProfileDropdown(false)

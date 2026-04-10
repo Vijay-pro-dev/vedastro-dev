@@ -14,9 +14,11 @@ from app.schemas.admin import SuspendUserPayload, UpdateUserRolePayload
 from app.schemas.question import QuestionCreate, QuestionUpdate, QuestionToggleStatus
 from app.schemas.config import SectionCreate, SubsectionCreate
 from app.schemas.rule import RuleCreate, RuleOut
+from app.schemas.suggestion import SuggestionAdminOut, SuggestionUpdateAdmin, SuggestionsAdminListResponse
 from fastapi import HTTPException
 from app.services.activity_service import create_activity_log
 from app.services.profile_service import build_profile, get_latest_birth_data, get_latest_career_profile
+from app.models.user import utc_now
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -199,6 +201,21 @@ def _serialize_activity_log(log: models.ActivityLog) -> dict:
         "data": json.loads(log.data) if log.data else {},
         "created_at": log.created_at.isoformat() if log.created_at else None,
     }
+
+
+def _serialize_suggestion_admin(record: models.Suggestion, user: models.User | None) -> SuggestionAdminOut:
+    return SuggestionAdminOut(
+        id=record.id,
+        user_id=record.user_id,
+        message=record.message,
+        status=record.status or "pending",
+        admin_response=getattr(record, "admin_response", None),
+        created_at=record.created_at.isoformat() if getattr(record, "created_at", None) else None,
+        updated_at=record.updated_at.isoformat() if getattr(record, "updated_at", None) else None,
+        resolved_at=record.resolved_at.isoformat() if getattr(record, "resolved_at", None) else None,
+        user_email=getattr(user, "email", None) if user else None,
+        user_name=getattr(user, "name", None) if user else None,
+    )
 
 
 @router.get("/dashboard")
@@ -752,6 +769,63 @@ def delete_user(user_id: int, _: dict = Depends(get_current_admin), db: Session 
     )
     db.commit()
     return {"message": "User deleted successfully", "user_id": user_id}
+
+
+@router.get("/suggestions", response_model=SuggestionsAdminListResponse)
+def list_suggestions(
+    status: str = "all",
+    _: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.Suggestion).order_by(models.Suggestion.created_at.desc())
+    normalized_status = (status or "all").lower().strip()
+    if normalized_status in {"pending", "resolved"}:
+        query = query.filter(models.Suggestion.status == normalized_status)
+
+    records = query.limit(250).all()
+    user_ids = {record.user_id for record in records}
+    users = {}
+    if user_ids:
+        users = {user.id: user for user in db.query(models.User).filter(models.User.id.in_(user_ids)).all()}
+
+    return {"suggestions": [_serialize_suggestion_admin(record, users.get(record.user_id)) for record in records]}
+
+
+@router.patch("/suggestions/{suggestion_id}", response_model=SuggestionAdminOut)
+def update_suggestion(
+    suggestion_id: int,
+    payload: SuggestionUpdateAdmin,
+    admin_payload: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    record = db.query(models.Suggestion).filter(models.Suggestion.id == suggestion_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+
+    if payload.status is not None:
+        record.status = payload.status
+        if payload.status == "resolved":
+            record.resolved_at = utc_now()
+        if payload.status == "pending":
+            record.resolved_at = None
+
+    if payload.admin_response is not None:
+        cleaned = payload.admin_response.strip()
+        record.admin_response = cleaned or None
+
+    record.touch()
+    create_activity_log(
+        db,
+        record.user_id,
+        "suggestion_updated",
+        "Admin updated suggestion status/response",
+        {"suggestion_id": record.id, "status": record.status, "admin_email": admin_payload.get("email")},
+    )
+    db.commit()
+    db.refresh(record)
+
+    user = db.query(models.User).filter(models.User.id == record.user_id).first()
+    return _serialize_suggestion_admin(record, user)
 
 
 @router.get("/export/users.csv")

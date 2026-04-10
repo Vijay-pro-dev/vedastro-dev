@@ -426,7 +426,11 @@ text-align:center;
 }
 
 .hero-default{
-  background-image:url('https://img.freepik.com/free-photo/mystical-numerology-scene_52683-107762.jpg?semt=ais_hybrid&w=740&q=80');
+  background-image: none;
+  background-color: #0c1227;
+  background: radial-gradient(circle at 20% 20%, rgba(88,118,255,0.18), transparent 30%),
+              radial-gradient(circle at 80% 10%, rgba(255,126,95,0.12), transparent 28%),
+              #0c1227;
 }
 
 .hero-logged-in{
@@ -1666,6 +1670,45 @@ align-items:center;
   align-items: stretch;
   gap: 10px;
   min-width: 120px;
+}
+
+.admin-suggestion-user strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.admin-suggestion-user small {
+  display: block;
+  color: #94a3b8;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.admin-suggestion-message {
+  min-width: 260px;
+  max-width: 420px;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.admin-suggestion-textarea {
+  width: 320px;
+  max-width: 360px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  padding: 10px 12px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.admin-suggestion-textarea:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
 }
 
 .admin-action-btn {
@@ -3723,15 +3766,194 @@ align-items:center;
   top: 110%;
   right: 0;
   margin-top: 6px;
-  background: rgba(15, 23, 42, 0.85);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.92));
   backdrop-filter: blur(22px);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 14px;
-  min-width: 240px;
+  border-radius: 18px;
+  width: min(280px, 92vw);
   overflow: hidden;
   box-shadow: 0 25px 60px rgba(0,0,0,0.55);
   z-index: 999;
   animation: slideDown 0.25s ease;
+}
+
+.dropdown-divider {
+  height: 1px;
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+}
+
+.dropdown-user {
+  padding: 18px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  color: #cbd5e1;
+  font-size: 13.5px;
+}
+
+.dropdown-user strong {
+  color: #38bdf8;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+
+.dropdown-user span {
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.dropdown-suggestions {
+  padding: 16px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggestion-title {
+  text-align: center;
+  font-size: 14px;
+  color: rgba(226, 232, 240, 0.9);
+  letter-spacing: 0.2px;
+}
+
+.suggestion-textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.03);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 35px rgba(0,0,0,0.25);
+  color: #e5e7eb;
+  padding: 12px 12px;
+  resize: vertical;
+  min-height: 84px;
+  font-family: inherit;
+  line-height: 1.35;
+}
+
+.suggestion-textarea::placeholder {
+  color: rgba(226, 232, 240, 0.45);
+}
+
+.suggestion-textarea:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow:
+    0 0 0 3px rgba(56, 189, 248, 0.16),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 18px 35px rgba(0,0,0,0.25);
+}
+
+.suggestion-send {
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+  padding: 6px 0;
+  color: rgba(226, 232, 240, 0.95);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.suggestion-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.suggestion-send:hover {
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.suggestion-send:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.55);
+  outline-offset: 3px;
+}
+
+.suggestions-hint {
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.62);
+  text-align: center;
+}
+
+.suggestions-hint.error {
+  color: rgba(248, 113, 113, 0.92);
+}
+
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 170px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.suggestions-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.suggestions-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+.suggestion-item {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.suggestion-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.suggestion-status {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: rgba(226, 232, 240, 0.84);
+}
+
+.suggestion-status.pending {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.suggestion-status.resolved {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.suggestion-date {
+  font-size: 11px;
+  color: rgba(226, 232, 240, 0.5);
+}
+
+.suggestion-message {
+  font-size: 12.5px;
+  color: rgba(226, 232, 240, 0.9);
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.suggestion-admin {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.75);
+  line-height: 1.35;
 }
 
 /* ANIMATION */
@@ -3748,41 +3970,6 @@ align-items:center;
 }
 
 /* ================= ITEMS ================= */
-
-.dropdown-item {
-  padding: 14px 18px;
-  color: #cbd5e1;
-  font-size: 13.5px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: all 0.2s ease;
-}
-
-/* FIRST ITEM (USER INFO) */
-
-.dropdown-item:first-child {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-
-/* USER NAME HIGHLIGHT */
-
-.dropdown-item strong {
-  color: #38bdf8;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-/* HOVER EFFECT */
-
-.dropdown-item:hover {
-  background: rgba(255,255,255,0.06);
-  color: #ffffff;
-}
 
 .dropdown-action {
   width: 100%;
@@ -4224,7 +4411,7 @@ background-clip: text;
   }
 
   .profile-dropdown {
-    min-width: 220px;
+    width: min(260px, 92vw);
     right: 0;
   }
 

@@ -17,6 +17,7 @@ from services.admin.router import router as admin_router
 from services.auth.router import router as auth_router
 from services.career.profile_router import router as profile_router
 from services.career.router import router as career_router
+from services.suggestions.router import router as suggestions_router
 
 settings = get_settings()
 
@@ -172,6 +173,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(profile_router)
     app.include_router(career_router)
+    app.include_router(suggestions_router)
 
     @app.on_event("startup")
     def startup() -> None:

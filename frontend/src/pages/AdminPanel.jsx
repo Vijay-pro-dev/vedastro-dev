@@ -97,6 +97,11 @@ function AdminPanel() {
   const [subsectionOptions, setSubsectionOptions] = useState([])
   const [energyOptions, setEnergyOptions] = useState([])
   const [showMenu, setShowMenu] = useState(false)
+  const [suggestionList, setSuggestionList] = useState([])
+  const [suggestionLoading, setSuggestionLoading] = useState(false)
+  const [suggestionError, setSuggestionError] = useState("")
+  const [suggestionStatusFilter, setSuggestionStatusFilter] = useState("all")
+  const [suggestionDrafts, setSuggestionDrafts] = useState({})
   const [newSection, setNewSection] = useState("")
   const [newElement, setNewElement] = useState("")
   const [questionForm, setQuestionForm] = useState({
@@ -164,6 +169,50 @@ function AdminPanel() {
     })
     setData(response.data)
   }, [])
+
+  const loadAdminSuggestions = useCallback(async (nextStatus = "all") => {
+    setSuggestionLoading(true)
+    setSuggestionError("")
+    try {
+      const adminToken = getAdminToken()
+      const response = await api.get("/admin/suggestions", {
+        params: { status: nextStatus },
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      })
+      setSuggestionList(response.data?.suggestions || [])
+      setSuggestionDrafts({})
+    } catch (requestError) {
+      setSuggestionError(getErrorMessage(requestError) || "Failed to load suggestions.")
+    } finally {
+      setSuggestionLoading(false)
+    }
+  }, [])
+
+  const saveSuggestionDraft = async (suggestionId, overridePatch = null) => {
+    const patch = overridePatch || suggestionDrafts[suggestionId]
+    if (!patch) return
+
+    try {
+      const adminToken = getAdminToken()
+      const response = await api.patch(`/admin/suggestions/${suggestionId}`, patch, {
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      })
+      const updated = response.data
+      setSuggestionList((current) => current.map((item) => (item.id === suggestionId ? updated : item)))
+      setSuggestionDrafts((current) => {
+        const next = { ...current }
+        delete next[suggestionId]
+        return next
+      })
+      showSuccess("Suggestion updated.")
+    } catch (requestError) {
+      showError(getErrorMessage(requestError) || "Failed to update suggestion.")
+    }
+  }
 
   useEffect(() => {
     const loadAdminDashboard = async () => {
@@ -870,6 +919,7 @@ function AdminPanel() {
   const topRoles = Object.entries(stats.top_roles || {})
   const nationalityChartData = Object.entries(stats.top_nationalities || {}).map(([name, value]) => ({ name, value }))
   const languageChartData = Object.entries(stats.top_languages || {}).map(([name, value]) => ({ name, value }))
+  const pendingSuggestionCount = suggestionList.filter((item) => item.status === "pending").length
 
   useEffect(() => {
     setCurrentUserPage(1)
@@ -897,6 +947,9 @@ function AdminPanel() {
     setShowMenu(false)
     if (id === "rules" && ruleList.length === 0 && !ruleLoading) {
       loadRules()
+    }
+    if (id === "suggestions" && suggestionList.length === 0 && !suggestionLoading) {
+      loadAdminSuggestions(suggestionStatusFilter)
     }
     setTimeout(() => scrollToSection(id), 40)
   }
@@ -978,6 +1031,11 @@ function AdminPanel() {
                 <span className="admin-menu-icon">👥</span>
                 <span>User Management</span>
                 <span className="admin-menu-badge">{users.length}</span>
+              </button>
+              <button className="admin-menu-item" onClick={() => handleSectionSelect("suggestions")}>
+                <span className="admin-menu-icon">💡</span>
+                <span>Suggestions</span>
+                <span className="admin-menu-badge">{pendingSuggestionCount}</span>
               </button>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("activity")}>
                 <span className="admin-menu-icon">🗒️</span>
@@ -1650,6 +1708,144 @@ function AdminPanel() {
               Show All Activity
             </button>
           </div>
+        </div>
+        )}
+
+        {activeSection === "suggestions" && (
+        <div className="admin-panel-card" id="suggestions">
+          <div className="admin-table-header">
+            <h3>User Suggestions</h3>
+            <span>{suggestionList.length} records</span>
+          </div>
+
+          <div className="admin-toolbar">
+            <select
+              className="admin-filter"
+              value={suggestionStatusFilter}
+              onChange={(event) => {
+                const next = event.target.value
+                setSuggestionStatusFilter(next)
+                loadAdminSuggestions(next)
+              }}
+            >
+              <option value="all">All</option>
+              <option value="pending">Pending</option>
+              <option value="resolved">Done</option>
+            </select>
+            <button
+              className="admin-action-btn"
+              disabled={suggestionLoading}
+              onClick={() => loadAdminSuggestions(suggestionStatusFilter)}
+            >
+              Refresh
+            </button>
+          </div>
+
+          {suggestionLoading ? (
+            <div className="skeleton-card">
+              <div className="skeleton-line short" />
+              <div className="skeleton-line" />
+              <div className="skeleton-line" />
+            </div>
+          ) : suggestionError ? (
+            <div className="empty-state-card compact">
+              <p>{suggestionError}</p>
+            </div>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Suggestion</th>
+                    <th>Status</th>
+                    <th>Admin Reply</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suggestionList.map((item) => {
+                    const draft = suggestionDrafts[item.id] || {}
+                    const statusValue = draft.status ?? item.status ?? "pending"
+                    const responseValue = draft.admin_response ?? item.admin_response ?? ""
+                    const hasDraft = Boolean(suggestionDrafts[item.id])
+
+                    return (
+                      <tr key={item.id}>
+                        <td>{item.id}</td>
+                        <td>
+                          <div className="admin-suggestion-user">
+                            <strong>{item.user_name || "User"}</strong>
+                            <small>{item.user_email || "-"}</small>
+                          </div>
+                        </td>
+                        <td className="admin-suggestion-message">{item.message}</td>
+                        <td>
+                          <select
+                            className="admin-filter admin-suggestion-select"
+                            value={statusValue}
+                            onChange={(event) => {
+                              const next = event.target.value
+                              setSuggestionDrafts((current) => ({
+                                ...current,
+                                [item.id]: { ...(current[item.id] || {}), status: next },
+                              }))
+                            }}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="resolved">Done</option>
+                          </select>
+                        </td>
+                        <td>
+                          <textarea
+                            className="admin-suggestion-textarea"
+                            rows={3}
+                            placeholder="Write an update for the user…"
+                            value={responseValue}
+                            onChange={(event) => {
+                              const next = event.target.value
+                              setSuggestionDrafts((current) => ({
+                                ...current,
+                                [item.id]: { ...(current[item.id] || {}), admin_response: next },
+                              }))
+                            }}
+                          />
+                        </td>
+                        <td>{item.created_at ? new Date(item.created_at).toLocaleDateString() : "-"}</td>
+                        <td>
+                          <div className="admin-row-actions">
+                            <button
+                              className="admin-action-btn"
+                              disabled={!hasDraft}
+                              onClick={() => saveSuggestionDraft(item.id)}
+                            >
+                              Save
+                            </button>
+                            <button
+                              className="admin-action-btn"
+                              onClick={() => saveSuggestionDraft(item.id, { status: "resolved", admin_response: responseValue })}
+                            >
+                              Mark Done
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+
+                  {suggestionList.length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="admin-empty-state">
+                        No suggestions found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
         )}
 
