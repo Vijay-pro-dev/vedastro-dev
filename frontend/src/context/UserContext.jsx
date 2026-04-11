@@ -5,6 +5,9 @@ import { getTranslations } from "../lib/i18n"
 
 const UserContext = createContext()
 
+const IDLE_LOGOUT_MS = 15 * 60 * 1000
+const LAST_ACTIVE_KEY = "vedastro_last_active_at"
+
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -53,6 +56,7 @@ export function UserProvider({ children }) {
       localStorage.setItem("refresh_token", refresh_token)
     }
     localStorage.setItem("user", JSON.stringify(userData))
+    localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
     if (userData?.role === "admin") {
       localStorage.setItem("admin_token", access_token)
       localStorage.setItem(
@@ -74,6 +78,7 @@ export function UserProvider({ children }) {
     localStorage.removeItem("user")
     localStorage.removeItem("admin_token")
     localStorage.removeItem("admin_user")
+    localStorage.removeItem(LAST_ACTIVE_KEY)
     setUser(null)
   }
 
@@ -94,6 +99,41 @@ export function UserProvider({ children }) {
   }
 
   const t = getTranslations(user?.language || "english")
+
+  useEffect(() => {
+    if (!user) return undefined
+
+    let lastWriteAt = 0
+
+    const markActive = () => {
+      const now = Date.now()
+      if (now - lastWriteAt < 10_000) return
+      lastWriteAt = now
+      localStorage.setItem(LAST_ACTIVE_KEY, String(now))
+    }
+
+    const checkIdle = () => {
+      const raw = localStorage.getItem(LAST_ACTIVE_KEY)
+      const lastActiveAt = raw ? Number(raw) : Date.now()
+      if (Number.isNaN(lastActiveAt)) return
+
+      if (Date.now() - lastActiveAt >= IDLE_LOGOUT_MS) {
+        logoutUser()
+        window.location.assign("/login")
+      }
+    }
+
+    markActive()
+    const interval = setInterval(checkIdle, 30_000)
+
+    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"]
+    events.forEach((eventName) => window.addEventListener(eventName, markActive, { passive: true }))
+
+    return () => {
+      clearInterval(interval)
+      events.forEach((eventName) => window.removeEventListener(eventName, markActive))
+    }
+  }, [user])
 
   return (
     <UserContext.Provider value={{ user, loginUser, logoutUser, updateUser, loading, t }}>

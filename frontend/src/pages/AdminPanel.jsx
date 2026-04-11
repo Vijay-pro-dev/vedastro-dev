@@ -19,6 +19,8 @@ const USER_PAGE_SIZE = 10
 const ACTIVITY_PAGE_SIZE = 12
 const chartColors = ["#22d3ee", "#38bdf8", "#4ade80", "#facc15", "#f97316"]
 const LOCAL_QUESTION_CACHE_KEY = "vedastro_admin_questions_cache"
+const SUGGESTION_PREVIEW_COUNT = 4
+const RULE_PREVIEW_COUNT = 4
 
 const QUESTION_SEED = [
   { question_text: "Do you have a clear long-term career goal?", section: "Awareness", display_order: 1 },
@@ -74,6 +76,7 @@ const getErrorMessage = (error) => {
 function AdminPanel() {
   const navigate = useNavigate()
   const { showError, showInfo, showSuccess } = useToast()
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 680 : false))
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -102,6 +105,7 @@ function AdminPanel() {
   const [suggestionError, setSuggestionError] = useState("")
   const [suggestionStatusFilter, setSuggestionStatusFilter] = useState("all")
   const [suggestionDrafts, setSuggestionDrafts] = useState({})
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false)
   const [newSection, setNewSection] = useState("")
   const [newElement, setNewElement] = useState("")
   const [questionForm, setQuestionForm] = useState({
@@ -121,6 +125,7 @@ function AdminPanel() {
   const [ruleLoading, setRuleLoading] = useState(false)
   const [ruleError, setRuleError] = useState("")
   const [editingRuleId, setEditingRuleId] = useState(null)
+  const [showAllRules, setShowAllRules] = useState(false)
   const [ruleForm, setRuleForm] = useState({
     rule_name: "",
     rule_type: "",
@@ -183,6 +188,7 @@ function AdminPanel() {
       })
       setSuggestionList(response.data?.suggestions || [])
       setSuggestionDrafts({})
+      setShowAllSuggestions(false)
     } catch (requestError) {
       setSuggestionError(getErrorMessage(requestError) || "Failed to load suggestions.")
     } finally {
@@ -237,6 +243,12 @@ function AdminPanel() {
 
     loadAdminDashboard()
   }, [navigate, loadAdminData, showError])
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 680)
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
 
   const loadQuestions = async () => {
     setQuestionLoading(true)
@@ -326,6 +338,7 @@ function AdminPanel() {
       const adminToken = getAdminToken()
       const resp = await api.get("/admin/rules", { headers: { Authorization: `Bearer ${adminToken}` } })
       setRuleList(resp.data?.rules || [])
+      setShowAllRules(false)
     } catch (err) {
       setRuleError(getErrorMessage(err))
       showError("Failed to load rules")
@@ -920,6 +933,8 @@ function AdminPanel() {
   const nationalityChartData = Object.entries(stats.top_nationalities || {}).map(([name, value]) => ({ name, value }))
   const languageChartData = Object.entries(stats.top_languages || {}).map(([name, value]) => ({ name, value }))
   const suggestionBadgeCount = suggestionList.length
+  const visibleSuggestions = showAllSuggestions ? suggestionList : suggestionList.slice(0, SUGGESTION_PREVIEW_COUNT)
+  const visibleRules = showAllRules ? ruleList : ruleList.slice(0, RULE_PREVIEW_COUNT)
 
   useEffect(() => {
     setCurrentUserPage(1)
@@ -1557,7 +1572,7 @@ function AdminPanel() {
           <div className="skeleton-line short" />
         </div>
       )}
-      {ruleList.map((rule) => (
+      {visibleRules.map((rule) => (
         <div key={rule.id} className="admin-question-item">
           <p className="admin-question-text">{rule.rule_name}</p>
           <div className="admin-question-meta">
@@ -1624,6 +1639,14 @@ function AdminPanel() {
       ))}
       {ruleList.length === 0 && !ruleLoading && <p className="admin-helper-text">No rules yet.</p>}
     </div>
+
+    {ruleList.length > RULE_PREVIEW_COUNT && (
+      <div className="admin-log-actions admin-log-actions-split">
+        <button className="admin-action-btn" onClick={() => setShowAllRules((current) => !current)}>
+          {showAllRules ? "Show Top 4 Rules" : `Show All Rules (${ruleList.length})`}
+        </button>
+      </div>
+    )}
   </div>
   )}
 
@@ -1715,7 +1738,7 @@ function AdminPanel() {
         <div className="admin-panel-card" id="suggestions">
           <div className="admin-table-header">
             <h3>User Suggestions</h3>
-            <span>{suggestionList.length} records</span>
+            <span>{showAllSuggestions ? suggestionList.length : Math.min(suggestionList.length, SUGGESTION_PREVIEW_COUNT)} records</span>
           </div>
 
           <div className="admin-toolbar">
@@ -1739,6 +1762,11 @@ function AdminPanel() {
             >
               Refresh
             </button>
+            {suggestionList.length > SUGGESTION_PREVIEW_COUNT && (
+              <button className="admin-action-btn" onClick={() => setShowAllSuggestions((current) => !current)}>
+                {showAllSuggestions ? "Show Top 4" : `Show All (${suggestionList.length})`}
+              </button>
+            )}
           </div>
 
           {suggestionLoading ? (
@@ -1752,56 +1780,66 @@ function AdminPanel() {
               <p>{suggestionError}</p>
             </div>
           ) : (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>User</th>
-                    <th>Suggestion</th>
-                    <th>Status</th>
-                    <th>Admin Reply</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {suggestionList.map((item) => {
+            <>
+              {isMobile ? (
+                <div className="admin-mobile-list">
+                  {visibleSuggestions.map((item) => {
                     const draft = suggestionDrafts[item.id] || {}
                     const statusValue = draft.status ?? item.status ?? "pending"
                     const responseValue = draft.admin_response ?? item.admin_response ?? ""
                     const hasDraft = Boolean(suggestionDrafts[item.id])
 
                     return (
-                      <tr key={item.id}>
-                        <td>{item.id}</td>
-                        <td>
-                          <div className="admin-suggestion-user">
-                            <strong>{item.user_name || "User"}</strong>
-                            <small>{item.user_email || "-"}</small>
+                      <div key={item.id} className="admin-mobile-card">
+                        <div className="admin-mobile-head">
+                          <div>
+                            <strong>Suggestion #{item.id}</strong>
+                            <div className="admin-mobile-sub">
+                              {item.user_name || "User"} · {item.user_email || "-"}
+                            </div>
                           </div>
-                        </td>
-                        <td className="admin-suggestion-message">{item.message}</td>
-                        <td>
-                          <select
-                            className="admin-filter admin-suggestion-select"
-                            value={statusValue}
-                            onChange={(event) => {
-                              const next = event.target.value
-                              setSuggestionDrafts((current) => ({
-                                ...current,
-                                [item.id]: { ...(current[item.id] || {}), status: next },
-                              }))
-                            }}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="resolved">Done</option>
-                          </select>
-                        </td>
-                        <td>
+                          <span className={`admin-status ${statusValue === "resolved" ? "done" : "pending"}`}>
+                            {statusValue === "resolved" ? "Done" : "Pending"}
+                          </span>
+                        </div>
+
+                        <div className="admin-mobile-block">
+                          <div className="admin-mobile-label">Message</div>
+                          <div className="admin-mobile-value wrap">{item.message}</div>
+                        </div>
+
+                        <div className="admin-mobile-grid">
+                          <div className="admin-mobile-block">
+                            <div className="admin-mobile-label">Status</div>
+                            <select
+                              className="admin-filter admin-mobile-select"
+                              value={statusValue}
+                              onChange={(event) => {
+                                const next = event.target.value
+                                setSuggestionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: { ...(current[item.id] || {}), status: next },
+                                }))
+                              }}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="resolved">Done</option>
+                            </select>
+                          </div>
+
+                          <div className="admin-mobile-block">
+                            <div className="admin-mobile-label">Created</div>
+                            <div className="admin-mobile-value">
+                              {item.created_at ? new Date(item.created_at).toLocaleString() : "-"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="admin-mobile-block">
+                          <div className="admin-mobile-label">Admin Reply</div>
                           <textarea
-                            className="admin-suggestion-textarea"
-                            rows={3}
+                            className="admin-suggestion-textarea admin-mobile-textarea"
+                            rows={4}
                             placeholder="Write an update for the user…"
                             value={responseValue}
                             onChange={(event) => {
@@ -1812,39 +1850,120 @@ function AdminPanel() {
                               }))
                             }}
                           />
-                        </td>
-                        <td>{item.created_at ? new Date(item.created_at).toLocaleDateString() : "-"}</td>
-                        <td>
-                          <div className="admin-row-actions">
-                            <button
-                              className="admin-action-btn"
-                              disabled={!hasDraft}
-                              onClick={() => saveSuggestionDraft(item.id)}
-                            >
-                              Save
-                            </button>
-                            <button
-                              className="admin-action-btn"
-                              onClick={() => saveSuggestionDraft(item.id, { status: "resolved", admin_response: responseValue })}
-                            >
-                              Mark Done
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                        </div>
+
+                        <div className="admin-mobile-actions">
+                          <button className="admin-action-btn" disabled={!hasDraft} onClick={() => saveSuggestionDraft(item.id)}>
+                            Save
+                          </button>
+                          <button
+                            className="admin-action-btn"
+                            onClick={() => saveSuggestionDraft(item.id, { status: "resolved", admin_response: responseValue })}
+                          >
+                            Mark Done
+                          </button>
+                        </div>
+                      </div>
                     )
                   })}
-
-                  {suggestionList.length === 0 && (
-                    <tr>
-                      <td colSpan="7" className="admin-empty-state">
-                        No suggestions found.
-                      </td>
-                    </tr>
+                  {visibleSuggestions.length === 0 && (
+                    <div className="empty-state-card compact">
+                      <p>No suggestions found.</p>
+                    </div>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              ) : (
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Suggestion</th>
+                        <th>Status</th>
+                        <th>Admin Reply</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleSuggestions.map((item) => {
+                        const draft = suggestionDrafts[item.id] || {}
+                        const statusValue = draft.status ?? item.status ?? "pending"
+                        const responseValue = draft.admin_response ?? item.admin_response ?? ""
+                        const hasDraft = Boolean(suggestionDrafts[item.id])
+
+                        return (
+                          <tr key={item.id}>
+                            <td>{item.id}</td>
+                            <td>
+                              <div className="admin-suggestion-user">
+                                <strong>{item.user_name || "User"}</strong>
+                                <small>{item.user_email || "-"}</small>
+                              </div>
+                            </td>
+                            <td className="admin-suggestion-message">{item.message}</td>
+                            <td>
+                              <select
+                                className="admin-filter admin-suggestion-select"
+                                value={statusValue}
+                                onChange={(event) => {
+                                  const next = event.target.value
+                                  setSuggestionDrafts((current) => ({
+                                    ...current,
+                                    [item.id]: { ...(current[item.id] || {}), status: next },
+                                  }))
+                                }}
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="resolved">Done</option>
+                              </select>
+                            </td>
+                            <td>
+                              <textarea
+                                className="admin-suggestion-textarea"
+                                rows={3}
+                                placeholder="Write an update for the user…"
+                                value={responseValue}
+                                onChange={(event) => {
+                                  const next = event.target.value
+                                  setSuggestionDrafts((current) => ({
+                                    ...current,
+                                    [item.id]: { ...(current[item.id] || {}), admin_response: next },
+                                  }))
+                                }}
+                              />
+                            </td>
+                            <td>{item.created_at ? new Date(item.created_at).toLocaleDateString() : "-"}</td>
+                            <td>
+                              <div className="admin-row-actions">
+                                <button className="admin-action-btn" disabled={!hasDraft} onClick={() => saveSuggestionDraft(item.id)}>
+                                  Save
+                                </button>
+                                <button
+                                  className="admin-action-btn"
+                                  onClick={() => saveSuggestionDraft(item.id, { status: "resolved", admin_response: responseValue })}
+                                >
+                                  Mark Done
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+
+                      {visibleSuggestions.length === 0 && (
+                        <tr>
+                          <td colSpan="7" className="admin-empty-state">
+                            No suggestions found.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
         )}
@@ -1874,37 +1993,34 @@ function AdminPanel() {
             </select>
           </div>
 
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Nationality</th>
-                  <th>Language</th>
-                  <th>Role</th>
-                  <th>Career Role</th>
-                  <th>Experience</th>
-                  <th>Goals</th>
-                  <th>Joined</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleUsers.map((user) => (
-                  <tr key={user.user_id}>
-                    <td>{user.user_id}</td>
-                    <td>{user.name}</td>
-                    <td>{user.email}</td>
-                    <td>{user.phone}</td>
-                    <td>{user.nationality}</td>
-                    <td>{user.language}</td>
-                    <td>
+          {isMobile ? (
+            <div className="admin-mobile-list">
+              {visibleUsers.map((user) => (
+                <div key={user.user_id} className="admin-mobile-card">
+                  <div className="admin-mobile-head">
+                    <div>
+                      <strong>
+                        #{user.user_id} · {user.name || "User"}
+                      </strong>
+                      <div className="admin-mobile-sub">{user.email}</div>
+                    </div>
+                    <div className="admin-status-stack">
+                      <span className={`admin-status ${user.profile_completed ? "done" : "pending"}`}>
+                        {user.profile_completed ? "Complete" : "Pending"}
+                      </span>
+                      {user.suspended && <span className="admin-status suspended">Suspended</span>}
+                    </div>
+                  </div>
+
+                  <div className="admin-mobile-grid">
+                    <div className="admin-mobile-block">
+                      <div className="admin-mobile-label">Phone</div>
+                      <div className="admin-mobile-value wrap">{user.phone || "-"}</div>
+                    </div>
+                    <div className="admin-mobile-block">
+                      <div className="admin-mobile-label">Role</div>
                       <select
-                        className="admin-role-select"
+                        className="admin-role-select admin-mobile-select"
                         value={user.role || "user"}
                         onChange={(event) => handleRoleChange(user.user_id, event.target.value)}
                       >
@@ -1912,44 +2028,132 @@ function AdminPanel() {
                         <option value="support">support</option>
                         <option value="admin">admin</option>
                       </select>
-                    </td>
-                    <td>{user.current_role}</td>
-                    <td>{user.years_experience} yrs</td>
-                    <td>{user.goals}</td>
-                    <td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : "-"}</td>
-                    <td>
-                      <div className="admin-status-stack">
-                        <span className={`admin-status ${user.profile_completed ? "done" : "pending"}`}>
-                          {user.profile_completed ? "Complete" : "Pending"}
-                        </span>
-                        {user.suspended && <span className="admin-status suspended">Suspended</span>}
+                    </div>
+                    <div className="admin-mobile-block">
+                      <div className="admin-mobile-label">Nationality</div>
+                      <div className="admin-mobile-value wrap">{user.nationality || "-"}</div>
+                    </div>
+                    <div className="admin-mobile-block">
+                      <div className="admin-mobile-label">Language</div>
+                      <div className="admin-mobile-value wrap">{user.language || "-"}</div>
+                    </div>
+                    <div className="admin-mobile-block">
+                      <div className="admin-mobile-label">Career</div>
+                      <div className="admin-mobile-value wrap">{user.current_role || "-"}</div>
+                    </div>
+                    <div className="admin-mobile-block">
+                      <div className="admin-mobile-label">Experience</div>
+                      <div className="admin-mobile-value">{user.years_experience || 0} yrs</div>
+                    </div>
+                    <div className="admin-mobile-block">
+                      <div className="admin-mobile-label">Goals</div>
+                      <div className="admin-mobile-value wrap">{user.goals || "-"}</div>
+                    </div>
+                    <div className="admin-mobile-block">
+                      <div className="admin-mobile-label">Joined</div>
+                      <div className="admin-mobile-value">
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : "-"}
                       </div>
-                    </td>
-                    <td>
-                      <div className="admin-row-actions">
-                        <button className="admin-action-btn" onClick={() => handleViewUser(user.user_id)}>
-                          View
-                        </button>
-                        <button className="admin-action-btn warn" onClick={() => handleSuspendToggle(user)}>
-                          {user.suspended ? "Unsuspend" : "Suspend"}
-                        </button>
-                        <button className="admin-action-btn danger" onClick={() => handleDeleteUser(user)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {visibleUsers.length === 0 && (
+                    </div>
+                  </div>
+
+                  <div className="admin-mobile-actions">
+                    <button className="admin-action-btn" onClick={() => handleViewUser(user.user_id)}>
+                      View
+                    </button>
+                    <button className="admin-action-btn warn" onClick={() => handleSuspendToggle(user)}>
+                      {user.suspended ? "Unsuspend" : "Suspend"}
+                    </button>
+                    <button className="admin-action-btn danger" onClick={() => handleDeleteUser(user)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {visibleUsers.length === 0 && (
+                <div className="empty-state-card compact">
+                  <p>No users match the current search or filter.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
                   <tr>
-                    <td colSpan="13" className="admin-empty-state">
-                      No users match the current search or filter.
-                    </td>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Nationality</th>
+                    <th>Language</th>
+                    <th>Role</th>
+                    <th>Career Role</th>
+                    <th>Experience</th>
+                    <th>Goals</th>
+                    <th>Joined</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {visibleUsers.map((user) => (
+                    <tr key={user.user_id}>
+                      <td>{user.user_id}</td>
+                      <td>{user.name}</td>
+                      <td>{user.email}</td>
+                      <td>{user.phone}</td>
+                      <td>{user.nationality}</td>
+                      <td>{user.language}</td>
+                      <td>
+                        <select
+                          className="admin-role-select"
+                          value={user.role || "user"}
+                          onChange={(event) => handleRoleChange(user.user_id, event.target.value)}
+                        >
+                          <option value="user">user</option>
+                          <option value="support">support</option>
+                          <option value="admin">admin</option>
+                        </select>
+                      </td>
+                      <td>{user.current_role}</td>
+                      <td>{user.years_experience} yrs</td>
+                      <td>{user.goals}</td>
+                      <td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : "-"}</td>
+                      <td>
+                        <div className="admin-status-stack">
+                          <span className={`admin-status ${user.profile_completed ? "done" : "pending"}`}>
+                            {user.profile_completed ? "Complete" : "Pending"}
+                          </span>
+                          {user.suspended && <span className="admin-status suspended">Suspended</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="admin-row-actions">
+                          <button className="admin-action-btn" onClick={() => handleViewUser(user.user_id)}>
+                            View
+                          </button>
+                          <button className="admin-action-btn warn" onClick={() => handleSuspendToggle(user)}>
+                            {user.suspended ? "Unsuspend" : "Suspend"}
+                          </button>
+                          <button className="admin-action-btn danger" onClick={() => handleDeleteUser(user)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {visibleUsers.length === 0 && (
+                    <tr>
+                      <td colSpan="13" className="admin-empty-state">
+                        No users match the current search or filter.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
           {filteredUsers.length > 5 && (
             <div className="admin-log-actions admin-log-actions-split">
               <button className="admin-action-btn" onClick={() => setShowAllUsers((current) => !current)}>
