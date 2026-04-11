@@ -18,6 +18,8 @@ const Signup = lazy(() => import("./pages/Signup"))
 const UserForm = lazy(() => import("./pages/UserForm"))
 const Questionnaire = lazy(() => import("./pages/Questionnaire"))
 const Results = lazy(() => import("./pages/Results"))
+const SuggestionsPage = lazy(() => import("./pages/SuggestionsPage"))
+const PromotionPage = lazy(() => import("./pages/PromotionPage"))
 
 function App() {
   return (
@@ -42,6 +44,15 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/questionnaire" element={<Questionnaire />} />
               <Route path="/newdashboard" element={<Results />} />
+              <Route path="/promo" element={<PromotionPage />} />
+              <Route
+                path="/suggestions"
+                element={
+                  <ProtectedRoute>
+                    <SuggestionsPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/profile"
                 element={

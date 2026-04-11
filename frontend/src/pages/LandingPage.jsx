@@ -23,11 +23,6 @@ function LandingPage() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
-  const [suggestionText, setSuggestionText] = useState("")
-  const [suggestions, setSuggestions] = useState([])
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
-  const [suggestionsError, setSuggestionsError] = useState("")
-  const [suggestionSending, setSuggestionSending] = useState(false)
   const [showLoginResetFields, setShowLoginResetFields] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [landingLanguage, setLandingLanguage] = useState(() => localStorage.getItem("landing_language") || "english")
@@ -110,37 +105,6 @@ function LandingPage() {
   }, [])
 
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-
-  const loadMySuggestions = async () => {
-    if (!user) return
-    setSuggestionsLoading(true)
-    setSuggestionsError("")
-    try {
-      const response = await api.get("/suggestions")
-      setSuggestions(response.data?.suggestions || [])
-    } catch (requestError) {
-      setSuggestionsError(requestError.response?.data?.detail || "Could not load suggestions.")
-    } finally {
-      setSuggestionsLoading(false)
-    }
-  }
-
-  const handleSendSuggestion = async () => {
-    const message = suggestionText.trim()
-    if (!message) return
-
-    setSuggestionSending(true)
-    setSuggestionsError("")
-    try {
-      const response = await api.post("/suggestions", { message })
-      setSuggestions((current) => [response.data, ...current].slice(0, 20))
-      setSuggestionText("")
-    } catch (requestError) {
-      setSuggestionsError(requestError.response?.data?.detail || "Could not send suggestion.")
-    } finally {
-      setSuggestionSending(false)
-    }
-  }
 
   const validatePassword = (password) => {
     if (password.length < 8) {
@@ -304,9 +268,6 @@ function LandingPage() {
                 aria-controls="profile-dropdown-menu"
                 onClick={() => {
                   setShowLanguageDropdown(false)
-                  if (!showProfileDropdown) {
-                    loadMySuggestions()
-                  }
                   setShowProfileDropdown((value) => !value)
                 }}
               >
@@ -320,54 +281,17 @@ function LandingPage() {
                     <span>{user.profile_completed ? pageT.dashboardReady : pageT.profilePending}</span>
                   </div>
                   <div className="dropdown-divider" aria-hidden="true" />
-                  <div className="dropdown-suggestions">
-                    <div className="suggestion-title">Suggestions</div>
-                    <textarea
-                      id="suggestion-box"
-                      className="suggestion-textarea"
-                      rows={3}
-                      placeholder="Tell us what to improve..."
-                      value={suggestionText}
-                      onChange={(e) => setSuggestionText(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <button
-                      type="button"
-                      className="suggestion-send"
-                      disabled={suggestionSending || !suggestionText.trim()}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleSendSuggestion()
-                      }}
-                    >
-                      {suggestionSending ? "Sending..." : "Send"}
-                    </button>
-
-                    {suggestionsError && <div className="suggestions-hint error">{suggestionsError}</div>}
-
-                    {suggestionsLoading ? (
-                      <div className="suggestions-hint">Loading your suggestions…</div>
-                    ) : suggestions.length ? (
-                      <div className="suggestions-list" onClick={(e) => e.stopPropagation()}>
-                        {suggestions.slice(0, 3).map((item) => (
-                          <div key={item.id} className="suggestion-item">
-                            <div className="suggestion-meta">
-                              <span className={`suggestion-status ${item.status === "resolved" ? "resolved" : "pending"}`}>
-                                {item.status === "resolved" ? "Done" : "Pending"}
-                              </span>
-                              <span className="suggestion-date">
-                                {item.created_at ? new Date(item.created_at).toLocaleDateString() : ""}
-                              </span>
-                            </div>
-                            <div className="suggestion-message">{item.message}</div>
-                            {item.admin_response && <div className="suggestion-admin">Admin: {item.admin_response}</div>}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="suggestions-hint">No suggestions yet.</div>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    className="dropdown-action"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowProfileDropdown(false)
+                      navigate("/suggestions")
+                    }}
+                  >
+                    <FaLightbulb /> Suggestions
+                  </button>
                   <div className="dropdown-divider" aria-hidden="true" />
                   <button
                     type="button"
