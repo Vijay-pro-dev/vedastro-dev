@@ -4158,12 +4158,29 @@ align-items:center;
 }
 
 .promo-card {
+  position: relative;
   border-radius: 22px;
   border: 1px solid rgba(255,255,255,0.08);
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.74), rgba(2, 6, 23, 0.84));
+  background:
+    radial-gradient(circle at 30% 10%, rgba(203, 163, 91, 0.11), transparent 55%),
+    radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.07), transparent 60%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.74), rgba(2, 6, 23, 0.86));
   backdrop-filter: blur(22px);
-  box-shadow: 0 28px 80px rgba(0,0,0,0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 0 0 1px rgba(255,255,255,0.05),
+    0 28px 80px rgba(0,0,0,0.6);
   overflow: hidden;
+}
+
+.promo-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 70px rgba(0,0,0,0.35);
+  opacity: 0.9;
 }
 
 .promo-hero {
@@ -4270,7 +4287,10 @@ align-items:center;
   border-radius: 28px;
   border: 1px solid rgba(255,255,255,0.12);
   background: linear-gradient(180deg, rgba(2,6,23,0.9), rgba(15,23,42,0.85));
-  box-shadow: 0 28px 80px rgba(0,0,0,0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 0 0 1px rgba(255,255,255,0.05),
+    0 28px 80px rgba(0,0,0,0.55);
   position: relative;
   padding: 14px;
 }
@@ -4433,10 +4453,28 @@ align-items:center;
   min-width: 130px;
 }
 
-.promo-pill.active {
-  background: linear-gradient(180deg, rgba(203, 163, 91, 0.85), rgba(126, 95, 40, 0.85));
+.promo-pill.clarity,
+.promo-pill.action {
+  border-color: rgba(242, 208, 140, 0.22);
+  background: linear-gradient(180deg, rgba(203, 163, 91, 0.14), rgba(2, 6, 23, 0.35));
+}
+
+.promo-pill.timing {
+  border-color: rgba(56, 189, 248, 0.24);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.12), rgba(2, 6, 23, 0.35));
+}
+
+.promo-pill.clarity.active,
+.promo-pill.action.active {
+  background: linear-gradient(180deg, rgba(203, 163, 91, 0.9), rgba(126, 95, 40, 0.9));
   color: #0b1022;
-  border-color: rgba(242, 208, 140, 0.5);
+  border-color: rgba(242, 208, 140, 0.55);
+}
+
+.promo-pill.timing.active {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.9), rgba(99, 102, 241, 0.85));
+  color: #0b1022;
+  border-color: rgba(56, 189, 248, 0.6);
 }
 
 .promo-pill-desc {

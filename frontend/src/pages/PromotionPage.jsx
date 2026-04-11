@@ -15,7 +15,7 @@ function PromotionPage() {
     [],
   )
 
-  const activeDesc = pills.find((p) => p.key === activePill)?.desc || ""
+  const activeDesc = pills.find((pill) => pill.key === activePill)?.desc || ""
 
   const goToLanding = () => {
     navigate("/?from=promo")
@@ -48,9 +48,7 @@ function PromotionPage() {
               <br />
               <span className="promo-muted">(and what to do next)</span>
             </h1>
-            <p className="promo-lead">
-              Understand your thinking, action pattern, and timing—before your next decision.
-            </p>
+            <p className="promo-lead">Understand your thinking, action pattern, and timing—before your next decision.</p>
 
             <button type="button" className="promo-cta primary" onClick={goToLanding}>
               Get Your Decision Insight <FaArrowRight />
@@ -123,7 +121,7 @@ function PromotionPage() {
                 type="button"
                 role="tab"
                 aria-selected={activePill === pill.key}
-                className={`promo-pill ${activePill === pill.key ? "active" : ""}`}
+                className={`promo-pill ${pill.key} ${activePill === pill.key ? "active" : ""}`}
                 onClick={() => setActivePill(pill.key)}
               >
                 {pill.label}
@@ -152,8 +150,8 @@ function PromotionPage() {
               inside your decisions
             </h2>
             <p className="promo-lead small">
-              You don’t make wrong decisions because you’re incapable. You make them because you can’t see the pattern
-              when it matters most.
+              You don’t make wrong decisions because you’re incapable. You make them because you can’t see the pattern when it
+              matters most.
             </p>
             <ul className="promo-bullets">
               <li>
