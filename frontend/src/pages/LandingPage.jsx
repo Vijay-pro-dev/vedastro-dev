@@ -6,6 +6,8 @@ import {
   FaChevronDown,
   FaEye,
   FaEyeSlash,
+  FaFacebookF,
+  FaInstagram,
   FaLightbulb,
   FaSignOutAlt,
   FaTimes,
@@ -18,6 +20,9 @@ import { getTranslations } from "../lib/i18n"
 function LandingPage() {
   const navigate = useNavigate()
   const { user, logoutUser, loginUser, updateUser } = useUser()
+
+  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL || "https://instagram.com/"
+  const facebookUrl = import.meta.env.VITE_FACEBOOK_URL || "https://facebook.com/"
 
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -517,6 +522,93 @@ function LandingPage() {
           </div>
         </div>
       </section>
+
+      <footer className="landing-footer">
+        <div className="landing-footer-inner">
+          <div className="landing-footer-top">
+            <div className="landing-footer-brand">
+              <div>
+                <div className="landing-footer-name">Vedastro</div>
+                <div className="landing-footer-tag">Career &amp; Decision Guidance</div>
+              </div>
+            </div>
+
+            <div className="landing-footer-social" aria-label="Social links">
+              <a href={instagramUrl} target="_blank" rel="noreferrer" aria-label="Instagram">
+                <FaInstagram />
+              </a>
+              <a href={facebookUrl} target="_blank" rel="noreferrer" aria-label="Facebook">
+                <FaFacebookF />
+              </a>
+            </div>
+          </div>
+
+          <div className="landing-footer-grid">
+            <div className="landing-footer-col">
+              <div className="landing-footer-title">Get Started</div>
+              <button
+                type="button"
+                className="landing-footer-link"
+                onClick={() => navigate("/form")}
+              >
+                Start Free Analysis
+              </button>
+              {user ? (
+                <button
+                  type="button"
+                  className="landing-footer-link"
+                  onClick={() => navigate(isAdmin ? "/admin-panel" : "/dashboard")}
+                >
+                  {isAdmin ? "Admin Panel" : "Dashboard"}
+                </button>
+              ) : (
+                <button type="button" className="landing-footer-link" onClick={() => navigate("/login")}>
+                  Login
+                </button>
+              )}
+              <button type="button" className="landing-footer-link" onClick={() => navigate("/promo")}>
+                Promotion Page
+              </button>
+            </div>
+
+            <div className="landing-footer-col">
+              <div className="landing-footer-title">Product</div>
+              <button type="button" className="landing-footer-link" onClick={() => navigate("/profile")}>
+                Profile
+              </button>
+              <button type="button" className="landing-footer-link" onClick={() => navigate("/suggestions")}>
+                Suggestions
+              </button>
+              <button
+                type="button"
+                className="landing-footer-link"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              >
+                Back to top
+              </button>
+            </div>
+
+            <div className="landing-footer-col">
+              <div className="landing-footer-title">Legal</div>
+              <button type="button" className="landing-footer-link disabled" disabled>
+                Privacy Policy
+              </button>
+              <button type="button" className="landing-footer-link disabled" disabled>
+                Terms of Service
+              </button>
+              <button type="button" className="landing-footer-link" onClick={() => navigate("/contact")}>
+                Contact Us
+              </button>
+            </div>
+          </div>
+
+          <div className="landing-footer-bottom">
+            <span>© {new Date().getFullYear()} Vedastro</span>
+            <span className="landing-footer-dot" aria-hidden="true">•</span>
+            <span>Built for clarity, action, timing</span>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

@@ -7,6 +7,7 @@ Create Date: 2026-04-05
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 revision = "0007_master_rule_table"
@@ -16,6 +17,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    if inspector.has_table("master_rule"):
+        return
+
     op.create_table(
         "master_rule",
         sa.Column("id", sa.Integer, primary_key=True),
@@ -52,4 +58,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("master_rule")
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    if inspector.has_table("master_rule"):
+        op.drop_table("master_rule")

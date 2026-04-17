@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react"
 import "./App.css"
 import AdminRoute from "./components/shared/AdminRoute"
 import PageLoader from "./components/shared/PageLoader"
+import ScrollToTop from "./components/shared/ScrollToTop"
 import { ToastProvider } from "./components/shared/ToastProvider"
 import { UserProvider } from "./context/UserContext"
 import ProtectedRoute from "./components/shared/ProtectedRoute"
@@ -20,12 +21,14 @@ const Questionnaire = lazy(() => import("./pages/Questionnaire"))
 const Results = lazy(() => import("./pages/Results"))
 const SuggestionsPage = lazy(() => import("./pages/SuggestionsPage"))
 const PromotionPage = lazy(() => import("./pages/PromotionPage"))
+const ContactPage = lazy(() => import("./pages/ContactPage"))
 
 function App() {
   return (
     <UserProvider>
       <ToastProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Suspense fallback={<PageLoader message="Loading page..." />}>
             <Routes>
               <Route path="/" element={<LandingPage />} />
@@ -45,6 +48,7 @@ function App() {
               <Route path="/questionnaire" element={<Questionnaire />} />
               <Route path="/newdashboard" element={<Results />} />
               <Route path="/promo" element={<PromotionPage />} />
+              <Route path="/contact" element={<ContactPage />} />
               <Route
                 path="/suggestions"
                 element={

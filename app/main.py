@@ -2,11 +2,17 @@ import os
 import sqlite3
 import logging
 import json
+import subprocess
+import sys
+import time
+import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -18,8 +24,16 @@ from services.auth.router import router as auth_router
 from services.career.profile_router import router as profile_router
 from services.career.router import router as career_router
 from services.suggestions.router import router as suggestions_router
+from services.contact.router import router as contact_router
 
 settings = get_settings()
+
+
+def alembic_quiet_enabled() -> bool:
+    value = os.getenv("ALEMBIC_QUIET")
+    if value is not None:
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return settings.debug or os.getenv("UVICORN_RELOAD", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def resolve_sqlite_database_file() -> str | None:
@@ -111,6 +125,9 @@ def ensure_sqlite_columns() -> None:
             "created_at": "ALTER TABLE career_profiles ADD COLUMN created_at TEXT",
             "updated_at": "ALTER TABLE career_profiles ADD COLUMN updated_at TEXT",
         },
+        "suggestions": {
+            "image_url": "ALTER TABLE suggestions ADD COLUMN image_url TEXT",
+        },
     }
 
     database_file = resolve_sqlite_database_file()
@@ -136,6 +153,50 @@ def ensure_sqlite_columns() -> None:
         conn.close()
 
 
+def run_migrations_if_enabled() -> None:
+    """Apply Alembic migrations on boot when explicitly enabled for the environment."""
+    if os.getenv("AUTO_RUN_MIGRATIONS", "false").strip().lower() not in {"1", "true", "yes", "on"}:
+        return
+    if os.getenv("VEDASTRO_MIGRATIONS_RAN", "").strip() == "1":
+        return
+
+    # Alembic's default `alembic_version.version_num` is VARCHAR(32). Our revision ids are longer,
+    # so ensure the column can store the full revision string before running migrations.
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT character_maximum_length
+                    FROM information_schema.columns
+                    WHERE table_name = 'alembic_version'
+                      AND column_name = 'version_num'
+                    """
+                )
+            ).fetchone()
+            max_len = row[0] if row else None
+            if max_len is not None and int(max_len) < 64:
+                conn.execute(text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)"))
+    except (SQLAlchemyError, OSError, ValueError):
+        # If the DB is not reachable or the table doesn't exist yet, Alembic will handle it.
+        pass
+
+    attempts = int(os.getenv("MIGRATION_RETRY_ATTEMPTS", "10"))
+    delay_seconds = float(os.getenv("MIGRATION_RETRY_DELAY_SECONDS", "3"))
+    command = [sys.executable, "-m", "alembic", "-c", "alembic.ini"]
+    if alembic_quiet_enabled():
+        command.append("-q")
+    command += ["upgrade", "head"]
+
+    for attempt in range(1, attempts + 1):
+        result = subprocess.run(command, check=False)
+        if result.returncode == 0:
+            return
+        if attempt == attempts:
+            raise SystemExit(result.returncode)
+        time.sleep(delay_seconds)
+
+
 def ensure_bootstrap_admin() -> None:
     db = Session(bind=engine)
     try:
@@ -147,9 +208,33 @@ def ensure_bootstrap_admin() -> None:
 def initialize_application_state() -> None:
     configure_logging()
     Path(settings.uploads_dir).mkdir(parents=True, exist_ok=True)
+    run_migrations_if_enabled()
     ensure_sqlite_columns()
     Base.metadata.create_all(bind=engine)
     ensure_bootstrap_admin()
+
+
+def install_windows_asyncio_connection_reset_suppression() -> None:
+    """Suppress noisy WinError 10054 callback tracebacks on Windows.
+
+    This does not change request handling; it only prevents asyncio from printing
+    an unhandled exception for client disconnects during transport shutdown.
+    """
+    if not sys.platform.startswith("win"):
+        return
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+
+    def handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, ConnectionResetError) and getattr(exc, "winerror", None) == 10054:
+            return
+        loop.default_exception_handler(context)
+
+    loop.set_exception_handler(handler)
 
 
 def create_app() -> FastAPI:
@@ -174,6 +259,11 @@ def create_app() -> FastAPI:
     app.include_router(profile_router)
     app.include_router(career_router)
     app.include_router(suggestions_router)
+    app.include_router(contact_router)
+
+    @app.on_event("startup")
+    async def install_asyncio_handlers() -> None:
+        install_windows_asyncio_connection_reset_suppression()
 
     @app.on_event("startup")
     def startup() -> None:

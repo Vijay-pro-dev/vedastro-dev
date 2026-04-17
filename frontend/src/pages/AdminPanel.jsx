@@ -1,5 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+﻿import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import {
+  FaArrowLeft,
+  FaBars,
+  FaClipboardList,
+  FaCogs,
+  FaHome,
+  FaLightbulb,
+  FaQuestionCircle,
+  FaTimes,
+  FaUsers,
+} from "react-icons/fa"
 import {
   Bar,
   BarChart,
@@ -973,8 +984,8 @@ function AdminPanel() {
     return (
       <div className="admin-panel-page">
         <div className="admin-panel-shell">
-          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-            ← Back
+          <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+            <FaArrowLeft />
           </button>
           <div className="admin-stats-grid">
             {[1, 2, 3, 4].map((item) => (
@@ -997,7 +1008,7 @@ function AdminPanel() {
             <h1>Admin Panel</h1>
             <p className="error-message">{error}</p>
             <button className="auth-button" onClick={() => navigate("/admin", { replace: true })}>
-              Back to Admin Login
+              Admin Login
             </button>
           </div>
         </div>
@@ -1009,11 +1020,19 @@ function AdminPanel() {
     <div className="admin-panel-page">
       <div className="admin-panel-shell">
         <div className="admin-topbar">
-          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-            ← Back
+          <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+            <FaArrowLeft />
           </button>
           <button className="admin-menu-toggle" aria-expanded={showMenu} onClick={() => setShowMenu((v) => !v)}>
-            {showMenu ? "✕ Close Menu" : "☰ Menu"}
+            {showMenu ? (
+              <>
+                <FaTimes /> Close Menu
+              </>
+            ) : (
+              <>
+                <FaBars /> Menu
+              </>
+            )}
           </button>
         </div>
 
@@ -1038,35 +1057,49 @@ function AdminPanel() {
             <div className="admin-menu-section">
               <p className="admin-menu-heading">Overview</p>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("dashboard")}>
-                <span className="admin-menu-icon">🏠</span>
+                <span className="admin-menu-icon" aria-hidden="true">
+                  <FaHome />
+                </span>
                 <span>Dashboard</span>
                 <span className="admin-menu-badge">{stats.total_users || 0}</span>
               </button>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("users")}>
-                <span className="admin-menu-icon">👥</span>
+                <span className="admin-menu-icon" aria-hidden="true">
+                  <FaUsers />
+                </span>
                 <span>User Management</span>
                 <span className="admin-menu-badge">{users.length}</span>
               </button>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("suggestions")}>
-                <span className="admin-menu-icon">💡</span>
+                <span className="admin-menu-icon" aria-hidden="true">
+                  <FaLightbulb />
+                </span>
                 <span>Suggestions</span>
                 <span className="admin-menu-badge">{suggestionBadgeCount}</span>
               </button>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("activity")}>
-                <span className="admin-menu-icon">🗒️</span>
+                <span className="admin-menu-icon" aria-hidden="true">
+                  <FaClipboardList />
+                </span>
                 <span>Activity Logs</span>
               </button>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("config")}>
-                <span className="admin-menu-icon">🛠️</span>
+                <span className="admin-menu-icon" aria-hidden="true">
+                  <FaCogs />
+                </span>
                 <span>Config</span>
               </button>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("questions")}>
-                <span className="admin-menu-icon">❓</span>
+                <span className="admin-menu-icon" aria-hidden="true">
+                  <FaQuestionCircle />
+                </span>
                 <span>Question Bank</span>
                 <span className="admin-menu-pill">Updated</span>
               </button>
               <button className="admin-menu-item" onClick={() => handleSectionSelect("rules")}>
-                <span className="admin-menu-icon">📐</span>
+                <span className="admin-menu-icon" aria-hidden="true">
+                  <FaClipboardList />
+                </span>
                 <span>Rules</span>
               </button>
             </div>
@@ -1577,7 +1610,7 @@ function AdminPanel() {
           <p className="admin-question-text">{rule.rule_name}</p>
           <div className="admin-question-meta">
             <span className="pill dark">{rule.rule_type || "rule"}</span>
-            <span className="pill">{rule.section ?? "—"}</span>
+            <span className="pill">{rule.section ?? "-"}</span>
           </div>
           {rule.insight && <p className="admin-helper-text">{rule.insight}</p>}
           <div className="admin-question-actions">
@@ -1663,7 +1696,9 @@ function AdminPanel() {
                 {sectionOptions.map((s) => (
                   <li key={s.id}>
                     {s.name} {s.is_active ? "" : "(inactive)"}
-                    <button className="admin-inline-remove" onClick={() => handleDeleteSection(s.id)}>✕</button>
+                    <button className="admin-inline-remove" onClick={() => handleDeleteSection(s.id)} aria-label="Remove section">
+                      <FaTimes />
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -1685,7 +1720,9 @@ function AdminPanel() {
                 {subsectionOptions.map((s) => (
                   <li key={s.id}>
                     {s.name} {s.is_active ? "" : "(inactive)"}
-                    <button className="admin-inline-remove" onClick={() => handleDeleteSubsection(s.id)}>✕</button>
+                    <button className="admin-inline-remove" onClick={() => handleDeleteSubsection(s.id)} aria-label="Remove subsection">
+                      <FaTimes />
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -1795,7 +1832,7 @@ function AdminPanel() {
                           <div>
                             <strong>Suggestion #{item.id}</strong>
                             <div className="admin-mobile-sub">
-                              {item.user_name || "User"} · {item.user_email || "-"}
+                              {item.user_name || "User"} Â· {item.user_email || "-"}
                             </div>
                           </div>
                           <span className={`admin-status ${statusValue === "resolved" ? "done" : "pending"}`}>
@@ -1806,6 +1843,11 @@ function AdminPanel() {
                         <div className="admin-mobile-block">
                           <div className="admin-mobile-label">Message</div>
                           <div className="admin-mobile-value wrap">{item.message}</div>
+                          {item.image_url && (
+                            <a className="admin-link" href={item.image_url} target="_blank" rel="noreferrer">
+                              View image
+                            </a>
+                          )}
                         </div>
 
                         <div className="admin-mobile-grid">
@@ -1840,7 +1882,7 @@ function AdminPanel() {
                           <textarea
                             className="admin-suggestion-textarea admin-mobile-textarea"
                             rows={4}
-                            placeholder="Write an update for the user…"
+                            placeholder="Write an update for the user..."
                             value={responseValue}
                             onChange={(event) => {
                               const next = event.target.value
@@ -1902,7 +1944,14 @@ function AdminPanel() {
                                 <small>{item.user_email || "-"}</small>
                               </div>
                             </td>
-                            <td className="admin-suggestion-message">{item.message}</td>
+                        <td className="admin-suggestion-message">
+                          <div>{item.message}</div>
+                          {item.image_url && (
+                            <a className="admin-link" href={item.image_url} target="_blank" rel="noreferrer">
+                              View image
+                            </a>
+                          )}
+                        </td>
                             <td>
                               <select
                                 className="admin-filter admin-suggestion-select"
@@ -1923,7 +1972,7 @@ function AdminPanel() {
                               <textarea
                                 className="admin-suggestion-textarea"
                                 rows={3}
-                                placeholder="Write an update for the user…"
+                                placeholder="Write an update for the user..."
                                 value={responseValue}
                                 onChange={(event) => {
                                   const next = event.target.value
@@ -2000,7 +2049,7 @@ function AdminPanel() {
                   <div className="admin-mobile-head">
                     <div>
                       <strong>
-                        #{user.user_id} · {user.name || "User"}
+                        #{user.user_id} Â· {user.name || "User"}
                       </strong>
                       <div className="admin-mobile-sub">{user.email}</div>
                     </div>

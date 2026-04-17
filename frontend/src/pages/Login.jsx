@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { FiEye, FiEyeOff, FiLock, FiLogIn, FiMail } from "react-icons/fi"
+import { FiArrowLeft, FiEye, FiEyeOff, FiLock, FiLogIn, FiMail } from "react-icons/fi"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
@@ -164,8 +164,8 @@ function Login() {
     <div className="auth-page login-page">
       <div className="auth-container auth-container-single">
         <div className="auth-card">
-          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-            ← Back
+          <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+            <FiArrowLeft />
           </button>
           <button
             type="button"
@@ -173,7 +173,7 @@ function Login() {
             aria-label="Close"
             onClick={() => navigate(-1)}
           >
-            ×
+            Ã—
           </button>
           <div className="auth-header">
             <h1>{t.welcomeBack}</h1>

@@ -7,6 +7,7 @@ Create Date: 2026-04-10
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 revision = "0008_suggestions_table"
@@ -16,6 +17,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    if inspector.has_table("suggestions"):
+        return
+
     op.create_table(
         "suggestions",
         sa.Column("id", sa.Integer, primary_key=True),
@@ -32,6 +38,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    if not inspector.has_table("suggestions"):
+        return
     op.drop_index("ix_suggestions_status", table_name="suggestions")
     op.drop_index("ix_suggestions_user_id", table_name="suggestions")
     op.drop_table("suggestions")

@@ -19,7 +19,8 @@ def _load_environment() -> None:
     }.get(current_env, current_env)
 
     load_dotenv(BASE_DIR / ".env", override=False)
-    load_dotenv(BASE_DIR / f".env.{env_alias}", override=False)
+    # Allow the environment-specific file (.env.dev/.env.prod) to override base defaults.
+    load_dotenv(BASE_DIR / f".env.{env_alias}", override=True)
 
 
 _load_environment()

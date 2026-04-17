@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { FaArrowLeft, FaArrowUp, FaBolt, FaBrain, FaFire, FaLeaf, FaRegStar, FaTint, FaWind } from "react-icons/fa"
 import { api } from "../lib/api"
 
 const Icon = ({ d }) => (
@@ -191,11 +192,11 @@ function Results() {
   }, [scores.awarenessScore, scores.timeAlignment, scores.actionScore])
 
   const elementBadges = [
-    { name: "Water", desc: "Emotion & Flow", color: "#1da1f2", emoji: "💧" },
-    { name: "Fire", desc: "Action & Drive", color: "#ff6a00", emoji: "🔥" },
-    { name: "Earth", desc: "Stability & Growth", color: "#58c16b", emoji: "🌿" },
-    { name: "Air", desc: "Thinking & Communication", color: "#6dd5ed", emoji: "💨" },
-    { name: "Space", desc: "Vision & Purpose", color: "#9b7bff", emoji: "✨" },
+    { name: "Water", desc: "Emotion & Flow", color: "#1da1f2", Icon: FaTint },
+    { name: "Fire", desc: "Action & Drive", color: "#ff6a00", Icon: FaFire },
+    { name: "Earth", desc: "Stability & Growth", color: "#58c16b", Icon: FaLeaf },
+    { name: "Air", desc: "Thinking & Communication", color: "#6dd5ed", Icon: FaWind },
+    { name: "Space", desc: "Vision & Purpose", color: "#9b7bff", Icon: FaRegStar },
   ]
 
   const topRules = useMemo(() => (rules || []).slice(0, 2), [rules])
@@ -223,12 +224,12 @@ function Results() {
 
     const avoidByCombo =
       strongest[0] === "Fire" && weakest[0] === "Earth"
-        ? "Avoid starting multiple things at once—finish one before starting another."
+        ? "Avoid starting multiple things at once - finish one before starting another."
         : "Avoid scattering focus; keep a single weekly priority."
 
     const opportunity =
       (elementBreakdown.Space ?? 0) > 70
-        ? "Next 60 days are high potential. If you act, you’ll see fast progress."
+        ? "Next 60 days are high potential. If you act, you'll see fast progress."
         : "Normal window. Focus on habits and clarity first."
 
     return {
@@ -266,8 +267,8 @@ function Results() {
 
   return (
     <div className="results-shell">
-      <button type="button" className="back-btn" onClick={() => navigate("/", { replace: true })}>
-        ← Back
+      <button type="button" className="back-btn" onClick={() => navigate("/", { replace: true })} aria-label="Go back">
+        <FaArrowLeft />
       </button>
       <div className="cosmic-top">
         <div className="cosmic-left">
@@ -275,9 +276,9 @@ function Results() {
           <h1>Career Clarity Assessment</h1>
           <p className="subtle">Answer 20 questions to calculate your Elements, Energy & Mind nature.</p>
           <div className="chip-row">
-            <span className="chip">⚡ Elements</span>
-            <span className="chip">🔥 Energy</span>
-            <span className="chip">🧠 Mind</span>
+            <span className="chip"><FaBolt /> Elements</span>
+            <span className="chip"><FaFire /> Energy</span>
+            <span className="chip"><FaBrain /> Mind</span>
           </div>
           <div className="element-chips-row">
             {elementBadges.map((badge) => (
@@ -286,7 +287,9 @@ function Results() {
                 className="element-chip"
                 style={{ background: `${badge.color}22`, borderColor: `${badge.color}55` }}
               >
-                <div className="chip-icon" style={{ background: badge.color }}>{badge.emoji}</div>
+                <div className="chip-icon" style={{ background: badge.color }}>
+                  <badge.Icon />
+                </div>
                 <div>
                   <div className="chip-name">{badge.name}</div>
                   <div className="chip-desc">{badge.desc}</div>
@@ -315,7 +318,7 @@ function Results() {
           <div className="card-header">
             <div>
               <h3>Alignment Snapshot</h3>
-              <p>We’ve turned your answers into clarity, timing, and action scores.</p>
+              <p>We've turned your answers into clarity, timing, and action scores.</p>
             </div>
             <div className="card-actions">
               <span className="pill dark">20 Questions</span>
@@ -460,7 +463,7 @@ function Results() {
             <ul className="todo-list">
               <li>
                 <input type="checkbox" id="todo-action" />
-                <label htmlFor="todo-action">{ruleAction || "Complete today’s priority action."}</label>
+                <label htmlFor="todo-action">{ruleAction || "Complete today's priority action."}</label>
               </li>
             </ul>
             <button type="button" className="fb-submit">Submit</button>
@@ -470,7 +473,7 @@ function Results() {
 
       {showTop && (
         <button className="top-button" type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top">
-          ↑
+          <FaArrowUp />
         </button>
       )}
     </div>

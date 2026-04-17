@@ -1,5 +1,6 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { FaArrowLeft } from "react-icons/fa"
 
 import { api } from "../lib/api"
 
@@ -37,8 +38,8 @@ function AdminLogin() {
     <div className="auth-page">
       <div className="auth-container auth-container-single">
         <div className="auth-card">
-          <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-            ← Back
+          <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+            <FaArrowLeft />
           </button>
           <div className="auth-header">
             <h1>Admin Login</h1>

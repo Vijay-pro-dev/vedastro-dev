@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react"
+﻿import { useEffect, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { FaArrowLeft, FaArrowUp } from "react-icons/fa"
 import {
   Area,
   AreaChart,
@@ -115,7 +116,7 @@ function Dashboard() {
         const guidance = {
           recommendations: [
             "Save your profile to keep this progress.",
-            guestScores.awareness_score < 70 ? "Clarify your goals in the profile to boost Awareness." : "Great awareness — keep tracking weekly.",
+            guestScores.awareness_score < 70 ? "Clarify your goals in the profile to boost Awareness." : "Great awareness - keep tracking weekly.",
             guestScores.action_integrity_score < 70 ? "Add 2 concrete weekly actions to raise Action score." : "Maintain your action routine; log wins in Dashboard.",
           ],
           summary: "Create an account to unlock AI-personalized guidance and save your answers.",
@@ -188,8 +189,8 @@ function Dashboard() {
   if (loading) {
     return (
       <div className="ultra-dashboard">
-        <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-          ← Back
+        <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+          <FaArrowLeft />
         </button>
         <div className="ultra-grid">
           {[1, 2, 3, 4].map((item) => (
@@ -207,8 +208,8 @@ function Dashboard() {
   if (!data) {
     return (
       <div className="ultra-dashboard">
-        <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-          ← Back
+        <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+          <FaArrowLeft />
         </button>
         <div className="empty-state-card">
           <h3>{t.noDashboardData}</h3>
@@ -231,8 +232,8 @@ function Dashboard() {
 
   return (
     <div className="ultra-dashboard">
-      <button type="button" className="back-btn" onClick={() => navigate(-1)}>
-        ← Back
+      <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+        <FaArrowLeft />
       </button>
       <div className="dashboard-header">
         <h1>{t.dashboard}</h1>
@@ -335,7 +336,7 @@ function Dashboard() {
         <div className="lock-overlay auth-modal" onClick={() => setShowAuthModal(false)}>
           <div className="lock-dialog" onClick={(e) => e.stopPropagation()}>
             <button className="ghost-close icon" onClick={() => setShowAuthModal(false)} aria-label="Close dialog">
-              ×
+              Ã—
             </button>
             <h3>Sign up to unlock Insights & Trends</h3>
             <p>We need an account to save your progress and show full analytics.</p>
@@ -364,7 +365,7 @@ function Dashboard() {
               }}
               aria-label="Close dialog"
             >
-              ×
+              Ã—
             </button>
             <h3>For more accurate result</h3>
             <p>Click below to answer a few more questions and sharpen your insights.</p>
@@ -489,7 +490,7 @@ function Dashboard() {
 
       {showTop && (
         <button className="top-button" type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top">
-          ↑
+          <FaArrowUp />
         </button>
       )}
     </div>

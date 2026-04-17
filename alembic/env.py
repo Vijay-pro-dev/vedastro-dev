@@ -1,3 +1,5 @@
+import logging
+import os
 from logging.config import fileConfig
 
 from alembic import context  # pyright: ignore[reportAttributeAccessIssue]
@@ -14,6 +16,9 @@ config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+    if os.getenv("ALEMBIC_QUIET", "").strip().lower() in {"1", "true", "yes", "on"}:
+        logging.getLogger("alembic").setLevel(logging.WARNING)
+        logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
 
 target_metadata = Base.metadata
 

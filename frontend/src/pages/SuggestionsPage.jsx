@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { FaArrowLeft, FaLightbulb } from "react-icons/fa"
 
@@ -10,10 +10,23 @@ function SuggestionsPage() {
   const { user } = useUser()
 
   const [suggestionText, setSuggestionText] = useState("")
+  const [imageFile, setImageFile] = useState(null)
+  const [imageUrl, setImageUrl] = useState("")
+  const [imageUploading, setImageUploading] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [sending, setSending] = useState(false)
+
+  const imagePreviewUrl = useMemo(() => {
+    if (!imageFile) return ""
+    return URL.createObjectURL(imageFile)
+  }, [imageFile])
+
+  useEffect(() => {
+    if (!imagePreviewUrl) return undefined
+    return () => URL.revokeObjectURL(imagePreviewUrl)
+  }, [imagePreviewUrl])
 
   const loadMySuggestions = async () => {
     if (!user) return
@@ -34,6 +47,26 @@ function SuggestionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const handleUploadImage = async (file) => {
+    if (!file) return
+
+    setImageUploading(true)
+    setError("")
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const response = await api.post("/suggestions/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      setImageUrl(response.data?.image_url || "")
+    } catch (requestError) {
+      setImageUrl("")
+      setError(requestError.response?.data?.detail || "Could not upload image.")
+    } finally {
+      setImageUploading(false)
+    }
+  }
+
   const handleSendSuggestion = async () => {
     const message = suggestionText.trim()
     if (!message) return
@@ -41,9 +74,13 @@ function SuggestionsPage() {
     setSending(true)
     setError("")
     try {
-      const response = await api.post("/suggestions", { message })
+      const payload = { message }
+      if (imageUrl) payload.image_url = imageUrl
+      const response = await api.post("/suggestions", payload)
       setSuggestions((current) => [response.data, ...current].slice(0, 20))
       setSuggestionText("")
+      setImageFile(null)
+      setImageUrl("")
     } catch (requestError) {
       setError(requestError.response?.data?.detail || "Could not send suggestion.")
     } finally {
@@ -52,10 +89,10 @@ function SuggestionsPage() {
   }
 
   return (
-    <div className="suggestions-page-shell">
+      <div className="suggestions-page-shell">
       <div className="suggestions-page-header">
-        <button type="button" className="suggestions-back" onClick={() => navigate(-1)}>
-          <FaArrowLeft /> Back
+        <button type="button" className="suggestions-back" onClick={() => navigate(-1)} aria-label="Go back">
+          <FaArrowLeft />
         </button>
       </div>
 
@@ -76,11 +113,47 @@ function SuggestionsPage() {
             value={suggestionText}
             onChange={(e) => setSuggestionText(e.target.value)}
           />
+          <div className="suggestions-upload">
+            <div className="suggestions-upload-row">
+              <label className="suggestions-upload-btn">
+                Upload image
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null
+                    setImageFile(file)
+                    setImageUrl("")
+                    if (file) handleUploadImage(file)
+                  }}
+                />
+              </label>
+              {imageUploading && <span className="suggestions-upload-hint">Uploading…</span>}
+              {!imageUploading && imageUrl && <span className="suggestions-upload-hint ok">Uploaded</span>}
+              {!imageUploading && imageFile && !imageUrl && <span className="suggestions-upload-hint">Ready</span>}
+            </div>
+
+            {(imagePreviewUrl || imageUrl) && (
+              <div className="suggestions-image-preview">
+                <img src={imageUrl || imagePreviewUrl} alt="Suggestion upload preview" />
+                <button
+                  type="button"
+                  className="suggestions-remove-image"
+                  onClick={() => {
+                    setImageFile(null)
+                    setImageUrl("")
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
           <div className="suggestions-form-actions">
             <button
               type="button"
               className="suggestions-send-btn"
-              disabled={sending || !suggestionText.trim()}
+              disabled={sending || imageUploading || !suggestionText.trim()}
               onClick={handleSendSuggestion}
             >
               {sending ? "Sending..." : "Send"}
@@ -108,6 +181,11 @@ function SuggestionsPage() {
                   </span>
                 </div>
                 <div className="suggestion-message">{item.message}</div>
+                {item.image_url && (
+                  <a className="suggestion-image-link" href={item.image_url} target="_blank" rel="noreferrer">
+                    View image
+                  </a>
+                )}
                 {item.admin_response && <div className="suggestion-admin">Admin: {item.admin_response}</div>}
               </div>
             ))}
@@ -121,4 +199,3 @@ function SuggestionsPage() {
 }
 
 export default SuggestionsPage
-

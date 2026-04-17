@@ -6,17 +6,29 @@ import os
 import subprocess
 import sys
 import time
-import asyncio
+
+
+def alembic_quiet_enabled() -> bool:
+    value = os.getenv("ALEMBIC_QUIET")
+    if value is not None:
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv("UVICORN_RELOAD", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def run_migrations_if_enabled() -> None:
     """Apply Alembic migrations before boot when enabled for the environment."""
     if os.getenv("AUTO_RUN_MIGRATIONS", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         return
+    # Prevent running migrations twice: once here and again inside the app's
+    # startup hook (used for the legacy `uvicorn main:app` flow).
+    os.environ["VEDASTRO_MIGRATIONS_RAN"] = "1"
 
     attempts = int(os.getenv("MIGRATION_RETRY_ATTEMPTS", "10"))
     delay_seconds = float(os.getenv("MIGRATION_RETRY_DELAY_SECONDS", "3"))
-    command = [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"]
+    command = [sys.executable, "-m", "alembic", "-c", "alembic.ini"]
+    if alembic_quiet_enabled():
+        command.append("-q")
+    command += ["upgrade", "head"]
 
     for attempt in range(1, attempts + 1):
         result = subprocess.run(command, check=False)
@@ -29,12 +41,6 @@ def run_migrations_if_enabled() -> None:
 
 def start_api() -> None:
     """Start the FastAPI app with or without reload based on the env settings."""
-    # On Windows the default ProactorEventLoop sometimes raises noisy
-    # ConnectionResetError callbacks when uvicorn shuts down sockets.
-    # Switching to the selector loop avoids the spurious traceback.
-    if sys.platform.startswith("win"):
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
     command = [
         sys.executable,
         "-m",

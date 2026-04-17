@@ -8,6 +8,7 @@ SuggestionStatus = Literal["pending", "resolved"]
 
 class SuggestionCreate(BaseModel):
     message: str = Field(min_length=3, max_length=2000)
+    image_url: Optional[str] = Field(default=None, max_length=4000)
 
 
 class SuggestionUpdateAdmin(BaseModel):
@@ -19,6 +20,7 @@ class SuggestionOut(BaseModel):
     id: int
     user_id: int
     message: str
+    image_url: Optional[str] = None
     status: SuggestionStatus
     admin_response: Optional[str] = None
     created_at: Optional[str] = None
@@ -37,4 +39,3 @@ class SuggestionsListResponse(BaseModel):
 
 class SuggestionsAdminListResponse(BaseModel):
     suggestions: list[SuggestionAdminOut]
-

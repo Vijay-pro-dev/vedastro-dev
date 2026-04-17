@@ -208,6 +208,7 @@ def _serialize_suggestion_admin(record: models.Suggestion, user: models.User | N
         id=record.id,
         user_id=record.user_id,
         message=record.message,
+        image_url=getattr(record, "image_url", None),
         status=record.status or "pending",
         admin_response=getattr(record, "admin_response", None),
         created_at=record.created_at.isoformat() if getattr(record, "created_at", None) else None,

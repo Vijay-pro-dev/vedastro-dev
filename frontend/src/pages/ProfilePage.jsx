@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useState } from "react"
+import { FaArrowLeft } from "react-icons/fa"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
@@ -168,8 +169,8 @@ function ProfilePage() {
 
   return (
     <div className="profile-page-shell">
-      <button type="button" className="back-btn" onClick={() => window.history.back()}>
-        ← Back
+      <button type="button" className="back-btn" onClick={() => window.history.back()} aria-label="Go back">
+        <FaArrowLeft />
       </button>
       <div className="profile-page-header">
         <div>
