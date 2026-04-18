@@ -46,6 +46,7 @@ function Questionnaire() {
   const [answers, setAnswers] = useState({})
   const [loading, setLoading] = useState(true)
   const [currentIdx, setCurrentIdx] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -83,24 +84,23 @@ function Questionnaire() {
   }, [user])
 
   const handleAnswer = (id, value) => {
-    setAnswers((curr) => {
-      const next = { ...curr, [id]: value }
-      localStorage.setItem("guest_questionnaire_answers", JSON.stringify(next))
-      return next
-    })
+    const next = { ...answers, [id]: value }
+    setAnswers(next)
+    localStorage.setItem("guest_questionnaire_answers", JSON.stringify(next))
     if (currentIdx < questions.length - 1) {
       setTimeout(() => setCurrentIdx((idx) => idx + 1), 150)
-    } else {
-      setTimeout(() => handleSubmit(), 150)
     }
   }
 
-  const handleSubmit = async () => {
-    if (questions.some((q) => q.is_required && !answers[q.id || q.question_id])) {
+  const handleSubmit = async (answersOverride) => {
+    const finalAnswers = answersOverride || answers
+    if (submitting) return
+    if (questions.some((q) => q.is_required && !finalAnswers[q.id || q.question_id])) {
       showError("Please answer all required questions.")
       return
     }
-    localStorage.setItem("guest_questionnaire_answers", JSON.stringify(answers))
+    setSubmitting(true)
+    localStorage.setItem("guest_questionnaire_answers", JSON.stringify(finalAnswers))
     localStorage.setItem("guest_questionnaire_questions", JSON.stringify(questions))
     showSuccess("Responses saved. Generating your results...")
     // try to persist to backend if authenticated
@@ -113,7 +113,7 @@ function Questionnaire() {
             const hasNumericId = Number.isInteger(numericId)
             return {
               question_id: hasNumericId ? numericId : null,
-              answer: answers[q.question_id || q.id],
+              answer: finalAnswers[q.question_id || q.id],
             }
           })
           .filter((item) => item.answer && item.question_id !== null),
@@ -123,10 +123,12 @@ function Questionnaire() {
       }
     } catch (error) {
       console.warn("Could not persist responses; continuing with local data", error)
+    } finally {
+      setSubmitting(false)
     }
     // mark completion locally so dashboard can redirect to the detailed view
     localStorage.setItem("questionnaire_completed", "true")
-    navigate("/newdashboard", { replace: true, state: { answers, questions } })
+    navigate("/newdashboard", { replace: true, state: { answers: finalAnswers, questions } })
   }
 
   const handleNext = () => {
@@ -162,6 +164,7 @@ function Questionnaire() {
   const currentId = currentQuestion?.id || currentQuestion?.question_id
   const progressText = `${currentIdx + 1} / ${questions.length}`
   const selected = answers[currentId]
+  const isLast = currentIdx === questions.length - 1
   const elementName = (currentQuestion?.subsection || currentQuestion?.element || "").trim()
   const elementId = currentQuestion?.element_id || currentQuestion?.elementId
   const elementKey = (() => {
@@ -185,7 +188,7 @@ function Questionnaire() {
       <div className={`question-window ${elementKey ? `element-${elementKey}` : ""}`}>
         <div className="window-bar">
           <button className="window-back" type="button" onClick={() => navigate(-1)} aria-label="Go back">
-            ←
+            <FiArrowLeft />
           </button>
           <span className="dot red" />
           <span className="dot yellow" />
@@ -195,7 +198,7 @@ function Questionnaire() {
         <div className="question-body">
           <p className="question-text">{currentQuestion.question_text}</p>
           <p className="question-caption">
-            Answer thoughtfully — honest inputs make your guidance sharper.
+            Answer thoughtfully - honest inputs make your guidance sharper.
           </p>
           <div className="qa-answers centered">
             {[1, 2, 3, 4, 5].map((val) => (
@@ -215,9 +218,16 @@ function Questionnaire() {
             <button className="icon-btn secondary" disabled={currentIdx === 0} onClick={handleBack} aria-label="Previous">
               <FiArrowLeft />
             </button>
-            <button className="icon-btn primary" onClick={handleNext} aria-label="Next">
-              <FiArrowRight />
-            </button>
+            {!isLast && (
+              <button className="icon-btn primary" onClick={handleNext} aria-label="Next" disabled={!selected}>
+                <FiArrowRight />
+              </button>
+            )}
+            {isLast && (
+              <button className="qa-submit-btn" type="button" onClick={() => handleSubmit({ ...answers })} disabled={!selected || submitting}>
+                {submitting ? "Submitting..." : "Submit"}
+              </button>
+            )}
           </div>
         </div>
       </div>

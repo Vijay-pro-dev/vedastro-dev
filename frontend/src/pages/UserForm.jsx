@@ -85,7 +85,7 @@ function UserForm() {
 
   const validateEducation = (value) => {
     const trimmed = value.trim()
-    if (trimmed.length < 5) return { isValid: false, message: "Education must be at least 5 characters." }
+    if (trimmed.length < 2) return { isValid: false, message: "Education must be at least 2 characters." }
     if (trimmed.length > 100) return { isValid: false, message: "Education seems too long." }
     if (!/^[A-Za-z., ]+$/.test(trimmed)) return { isValid: false, message: "Use letters, spaces, dots, and commas only." }
     return { isValid: true, message: "Valid" }

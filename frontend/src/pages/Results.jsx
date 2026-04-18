@@ -16,22 +16,35 @@ const ICONS = {
   risk: "M12 3 3 19h18L12 3Zm0 8v3m0 3h.01",
   mistake: "M9 9l6 6m0-6-6 6",
 }
-const getScoresFromDraft = (draft = {}) => {
-  const required = ["name", "phone", "dob", "birth_place", "education", "interests", "goals", "current_role"]
-  const filled = required.filter((f) => draft[f] && String(draft[f]).trim() !== "").length
-  const completeness = Math.max(20, Math.round((filled / required.length) * 100))
-  const years = Number(draft.years_experience || 0)
-  const timeAlignment = Math.min(100, Math.round(completeness * 0.6 + Math.min(years, 15) * 2.5))
-  const actionIntegrity =
-    (draft.goals ? 20 : 0) +
-    (draft.interests ? 15 : 0) +
-    (draft.current_role ? 15 : 0) +
-    (draft.education ? 10 : 0) +
-    (draft.role_match === "high" ? 20 : draft.role_match === "medium" ? 10 : 5) +
-    (draft.goal_clarity === "high" ? 20 : draft.goal_clarity === "medium" ? 12 : 6)
-  const actionScore = Math.min(100, Math.max(30, Math.round(actionIntegrity)))
-  const awarenessScore = Math.min(100, Math.max(30, completeness))
-  const careerAlignmentScore = Math.round((awarenessScore + timeAlignment + actionScore) / 3)
+const getScoresFromAnswers = (answers = {}, questions = []) => {
+  const mapValue = { 1: 0, 2: 25, 3: 50, 4: 75, 5: 100 }
+  const buckets = { awareness: [], time: [], action: [] }
+
+  Object.entries(answers || {}).forEach(([id, val]) => {
+    const q = (questions || []).find((item) => (item.id || item.question_id) == id)
+    const rawSection = (q?.section || q?.category || q?.category_id || "").toString().trim().toLowerCase()
+    const numericCategory = Number(q?.category_id)
+
+    const mapped = mapValue[val] ?? 0
+
+    if (Number.isFinite(numericCategory) && numericCategory) {
+      if (numericCategory === 1) buckets.awareness.push(mapped)
+      else if (numericCategory === 2) buckets.time.push(mapped)
+      else if (numericCategory === 3) buckets.action.push(mapped)
+      return
+    }
+
+    if (rawSection.includes("awareness") || rawSection.includes("clarity")) buckets.awareness.push(mapped)
+    else if (rawSection.includes("time") || rawSection.includes("opportunity") || rawSection.includes("alignment")) buckets.time.push(mapped)
+    else if (rawSection.includes("action") || rawSection.includes("execution")) buckets.action.push(mapped)
+  })
+
+  const avg = (arr) => (arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0)
+  const awarenessScore = avg(buckets.awareness)
+  const timeAlignment = avg(buckets.time)
+  const actionScore = avg(buckets.action)
+  const parts = [awarenessScore, timeAlignment, actionScore]
+  const careerAlignmentScore = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length)
   return { awarenessScore, timeAlignment, actionScore, careerAlignmentScore }
 }
 
@@ -105,10 +118,6 @@ function Results() {
     window.addEventListener("scroll", onScroll)
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
-  const draft = useMemo(() => {
-    const stored = JSON.parse(localStorage.getItem("guest_profile_draft") || "{}")
-    return location.state?.guestProfile || stored.formData ? { ...(stored.formData || {}), ...(stored.careerData || {}) } : stored
-  }, [location.state])
 
   const answers = useMemo(() => {
     if (apiAnswers) return apiAnswers
@@ -132,8 +141,11 @@ function Results() {
       const careerAlignmentScore = Math.round(alignment.overall_score ?? 0)
       return { awarenessScore, timeAlignment, actionScore, careerAlignmentScore }
     }
-    return getScoresFromDraft(draft)
-  }, [draft, alignment])
+    if (!answers || !Object.keys(answers).length) {
+      return { awarenessScore: 0, timeAlignment: 0, actionScore: 0, careerAlignmentScore: 0 }
+    }
+    return getScoresFromAnswers(answers, questionsList)
+  }, [alignment, answers, questionsList])
 
   const elementBreakdown = useMemo(() => {
     const mapValue = { 1: 0, 2: 25, 3: 50, 4: 75, 5: 100 }

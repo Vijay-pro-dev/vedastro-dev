@@ -161,9 +161,11 @@ def full_report_pdf(current_user: models.User = Depends(get_current_user), db: S
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "scores": {
             "overall": alignment.get("overall_score"),
-            "alignment": alignment.get("awareness_score"),
+            # Match NewDashboard "Alignment Snapshot" cards:
+            # Awareness (Clarity), Time (Opportunity), Action (Execution)
+            "awareness": alignment.get("awareness_score"),
             "time": alignment.get("time_alignment_score"),
-            "opportunity": scores.get("opportunity"),
+            "action": alignment.get("action_integrity_score"),
         },
         "rule_matches": [r.get("rule_name") for r in rules[:5] if isinstance(r, dict) and r.get("rule_name")],
         "sections": {

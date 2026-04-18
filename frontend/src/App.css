@@ -3677,6 +3677,32 @@ align-items:center;
   cursor: not-allowed;
   box-shadow: none;
 }
+
+.qa-submit-btn {
+  min-width: 140px;
+  height: 46px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(120deg, #4f46e5, #6366f1);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.qa-submit-btn:hover:enabled {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.qa-submit-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
 .page-container.narrow {
   max-width: 900px;
   margin: 0 auto;

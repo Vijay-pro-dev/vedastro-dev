@@ -352,6 +352,29 @@ def build_professional_report_pdf(payload: dict, *, spec: PdfPageSpec | None = N
             s = str(x).strip()
             return s if s else "Not available"
 
+    def score_num(x) -> float | None:
+        if x is None:
+            return None
+        try:
+            n = float(x)
+        except Exception:
+            return None
+        if n != n:  # NaN
+            return None
+        if n < 0:
+            n = 0.0
+        if n > 100:
+            n = 100.0
+        return n
+
+    def score_text(x) -> str:
+        n = score_num(x)
+        if n is None:
+            return "Not available"
+        if float(n).is_integer():
+            return str(int(n))
+        return f"{n:.1f}"
+
     user = payload.get("user") if isinstance(payload.get("user"), dict) else {}
     generated_at = str(payload.get("generated_at") or "").strip() or "Not available"
     scores = payload.get("scores") if isinstance(payload.get("scores"), dict) else {}
@@ -422,9 +445,9 @@ def build_professional_report_pdf(payload: dict, *, spec: PdfPageSpec | None = N
 
     # Score card (left column)
     card_h = 270
-    inner_y = card("Career Score Summary", left_col, y, col_w, card_h)
+    inner_y = card("Alignment Snapshot", left_col, y, col_w, card_h)
 
-    overall_text = val(scores.get("overall"))
+    overall_text = score_text(scores.get("overall"))
     canvas.set_fill_rgb(*chip_bg)
     canvas.round_rect(left_col + 18, inner_y - 52, col_w - 36, 56, 12, fill=True, stroke=False)
     canvas.text("Overall", x=left_col + 34, y=inner_y - 22, size=10, bold=False, color=text_muted)
@@ -434,26 +457,24 @@ def build_professional_report_pdf(payload: dict, *, spec: PdfPageSpec | None = N
     inner_y = inner_y - 72
 
     def progress_row(label: str, value_raw, color) -> float:
-        value = val(value_raw)
+        clamped = score_num(value_raw)
+        value = score_text(value_raw)
         canvas.text(label, x=left_col + 18, y=inner_y, size=10, bold=True, color=text_dark)
         canvas.text(value, x=left_col + col_w - 18 - _estimate_text_width(value, 10), y=inner_y, size=10, bold=True, color=text_dark)
         y_bar = inner_y - 10
         bar_w = col_w - 36
         canvas.set_fill_rgb(*bar_bg)
         canvas.round_rect(left_col + 18, y_bar - 8, bar_w, 8, 4, fill=True, stroke=False)
-        try:
-            pct = max(0.0, min(1.0, float(value_raw) / 100.0))
-        except Exception:
-            pct = 0.0
+        pct = 0.0 if clamped is None else max(0.0, min(1.0, float(clamped) / 100.0))
         fill_w = max(0.0, bar_w * pct)
         if fill_w > 0:
             canvas.set_fill_rgb(*color)
             canvas.round_rect(left_col + 18, y_bar - 8, fill_w, 8, 4, fill=True, stroke=False)
         return inner_y - 34
 
-    inner_y = progress_row("Alignment", scores.get("alignment"), accent)
-    inner_y = progress_row("Time", scores.get("time"), amber)
-    inner_y = progress_row("Opportunity", scores.get("opportunity"), violet)
+    inner_y = progress_row("Awareness (Clarity)", scores.get("awareness"), accent)
+    inner_y = progress_row("Time (Opportunity)", scores.get("time"), amber)
+    inner_y = progress_row("Action (Execution)", scores.get("action"), violet)
 
     # Guidance card (right column)
     card2_h = 270

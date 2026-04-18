@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { FaArrowLeft, FaArrowUp } from "react-icons/fa"
+import { FaArrowLeft, FaArrowUp, FaTimes } from "react-icons/fa"
 import {
   Area,
   AreaChart,
@@ -336,13 +336,12 @@ function Dashboard() {
         <div className="lock-overlay auth-modal" onClick={() => setShowAuthModal(false)}>
           <div className="lock-dialog" onClick={(e) => e.stopPropagation()}>
             <button className="ghost-close icon" onClick={() => setShowAuthModal(false)} aria-label="Close dialog">
-              Ã—
+              <FaTimes />
             </button>
             <h3>Sign up to unlock Insights & Trends</h3>
             <p>We need an account to save your progress and show full analytics.</p>
             <div className="lock-actions">
               <button className="btn primary" onClick={() => navigate("/signup")}>Sign up</button>
-              <button className="btn secondary" onClick={() => navigate("/login")}>Login</button>
             </div>
           </div>
         </div>
@@ -365,7 +364,7 @@ function Dashboard() {
               }}
               aria-label="Close dialog"
             >
-              Ã—
+              <FaTimes />
             </button>
             <h3>For more accurate result</h3>
             <p>Click below to answer a few more questions and sharpen your insights.</p>
