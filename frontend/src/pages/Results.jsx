@@ -44,6 +44,7 @@ function Results() {
   const [rules, setRules] = useState([])
   const [retakeLoading, setRetakeLoading] = useState(false)
   const [showTop, setShowTop] = useState(false)
+  const [reportPaid, setReportPaid] = useState(false)
 
   // Try to hydrate answers/questions from backend if authenticated
   useEffect(() => {
@@ -88,6 +89,15 @@ function Results() {
       }
     }
     load()
+  }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (!token) return
+    api
+      .get("/payments/report/status")
+      .then((r) => setReportPaid(Boolean(r.data?.paid)))
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -467,6 +477,20 @@ function Results() {
               </li>
             </ul>
             <button type="button" className="fb-submit">Submit</button>
+          </div>
+          <div className="card full-report-card">
+            <div className="full-report-copy">
+              <div className="card-header">
+                <h3>Full Report</h3>
+                <span className="pill dark">{reportPaid ? "Unlocked" : "Locked"}</span>
+              </div>
+              <p className="subtle">
+                Unlock the full report when you're ready.
+              </p>
+            </div>
+            <button type="button" className="auth-button" onClick={() => navigate("/report/unlock")}>
+              {reportPaid ? "View Full Report" : "Unlock Full Report"}
+            </button>
           </div>
         </div>
       </div>

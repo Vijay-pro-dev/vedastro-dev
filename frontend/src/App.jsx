@@ -19,6 +19,7 @@ const Signup = lazy(() => import("./pages/Signup"))
 const UserForm = lazy(() => import("./pages/UserForm"))
 const Questionnaire = lazy(() => import("./pages/Questionnaire"))
 const Results = lazy(() => import("./pages/Results"))
+const ReportUnlock = lazy(() => import("./pages/ReportUnlock"))
 const SuggestionsPage = lazy(() => import("./pages/SuggestionsPage"))
 const PromotionPage = lazy(() => import("./pages/PromotionPage"))
 const ContactPage = lazy(() => import("./pages/ContactPage"))
@@ -47,6 +48,14 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/questionnaire" element={<Questionnaire />} />
               <Route path="/newdashboard" element={<Results />} />
+              <Route
+                path="/report/unlock"
+                element={
+                  <ProtectedRoute>
+                    <ReportUnlock />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/promo" element={<PromotionPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route

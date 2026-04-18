@@ -86,6 +86,15 @@ class Settings:
     smtp_use_tls: bool = _env_bool("SMTP_USE_TLS", True)
     request_log_file: str = os.getenv("REQUEST_LOG_FILE", "logs/backend.log")
     security_log_file: str = os.getenv("SECURITY_LOG_FILE", "logs/backend.err.log")
+    razorpay_key_id: str = os.getenv("RAZORPAY_KEY_ID", "")
+    razorpay_key_secret: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+    report_product_key: str = os.getenv("REPORT_PRODUCT_KEY", "career_report_v1")
+    report_currency: str = os.getenv("REPORT_CURRENCY", "INR")
+    report_monthly_price_paise: int = int(os.getenv("REPORT_MONTHLY_PRICE_PAISE", "9900"))
+    report_yearly_price_paise: int = int(os.getenv("REPORT_YEARLY_PRICE_PAISE", "49900"))
+    report_monthly_price_cents: int = int(os.getenv("REPORT_MONTHLY_PRICE_CENTS", "1999"))
+    report_yearly_price_cents: int = int(os.getenv("REPORT_YEARLY_PRICE_CENTS", "9999"))
+    payment_force_currency: str = os.getenv("PAYMENT_FORCE_CURRENCY", "").strip().upper()
 
     def __post_init__(self) -> None:
         if self.secret_key_fallbacks is None:

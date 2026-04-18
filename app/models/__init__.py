@@ -31,3 +31,5 @@ from app.models.question import (
 from app.models.rule import MasterRule
 from app.models.suggestion import Suggestion
 from app.models.contact_message import ContactMessage
+from app.models.payment import ReportPayment
+from app.models.subscription import SubscriptionPlan, UserSubscription

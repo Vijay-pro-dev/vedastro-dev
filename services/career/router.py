@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -8,9 +11,13 @@ from app.core.database import get_db
 from services.auth.router import get_current_user
 from app.services.dashboard_service import build_dashboard
 from app.services.profile_service import build_profile, get_latest_birth_data, get_latest_career_profile
+from app.services.payment_service import has_paid_report
+from app.services.pdf_service import build_professional_report_pdf
+from app.core.config import get_settings
 
 
 router = APIRouter(tags=["dashboard"])
+settings = get_settings()
 
 
 class ResponseIn(BaseModel):
@@ -100,6 +107,79 @@ def career_dashboard_by_id(user_id: int, current_user: models.User = Depends(get
         get_latest_career_profile(db, current_user.id),
     )
     return build_dashboard(profile)
+
+
+@router.get("/career/report/full")
+def full_report(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return a detailed report payload once the user has purchased report access."""
+    if not has_paid_report(db, current_user.id, settings.report_product_key):
+        raise HTTPException(status_code=402, detail="Payment required")
+
+    profile = build_profile(
+        current_user,
+        get_latest_birth_data(db, current_user.id),
+        get_latest_career_profile(db, current_user.id),
+    )
+    dashboard = build_dashboard(profile)
+    return {
+        "product_key": settings.report_product_key,
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "dashboard": dashboard,
+    }
+
+
+@router.get("/career/report/pdf")
+def full_report_pdf(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Download a simple PDF version of the full report (based on NewDashboard data)."""
+    if not has_paid_report(db, current_user.id, settings.report_product_key):
+        raise HTTPException(status_code=402, detail="Payment required")
+
+    # Reuse the same sources the NewDashboard relies on.
+    alignment_payload = latest_alignment(current_user=current_user, db=db)
+    responses_payload = latest_responses(current_user=current_user, db=db)
+    rules_payload = latest_rules(current_user=current_user, db=db)
+
+    alignment = alignment_payload.get("alignment") if isinstance(alignment_payload, dict) else {}
+    responses = (responses_payload.get("responses") if isinstance(responses_payload, dict) else []) or []
+    rules = (rules_payload.get("rules") if isinstance(rules_payload, dict) else []) or []
+    scores = (rules_payload.get("scores") if isinstance(rules_payload, dict) else {}) or {}
+
+    user = {
+        "id": getattr(current_user, "id", None),
+        "name": getattr(current_user, "name", None),
+        "email": getattr(current_user, "email", None),
+    }
+
+    primary_rule = rules[0] if isinstance(rules, list) and rules else None
+    rule_insight = (primary_rule.get("insight") or primary_rule.get("customer_message")) if primary_rule else None
+    rule_action = (primary_rule.get("next_move") or primary_rule.get("alternative") or primary_rule.get("customer_message")) if primary_rule else None
+    rule_risk = primary_rule.get("risk") if primary_rule else None
+    rule_mistake = primary_rule.get("mistake") if primary_rule else None
+
+    report_payload = {
+        "user": {"name": user.get("name"), "email": user.get("email")},
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "scores": {
+            "overall": alignment.get("overall_score"),
+            "alignment": alignment.get("awareness_score"),
+            "time": alignment.get("time_alignment_score"),
+            "opportunity": scores.get("opportunity"),
+        },
+        "rule_matches": [r.get("rule_name") for r in rules[:5] if isinstance(r, dict) and r.get("rule_name")],
+        "sections": {
+            "insights": (str(rule_insight).strip() if rule_insight else ""),
+            "action": (str(rule_action).strip() if rule_action else ""),
+            "mistake": (str(rule_mistake).strip() if rule_mistake else ""),
+            "risk": (str(rule_risk).strip() if rule_risk else ""),
+        },
+    }
+
+    pdf_bytes = build_professional_report_pdf(report_payload)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=vedastro-report.pdf"},
+    )
 
 
 @router.post("/career/responses")

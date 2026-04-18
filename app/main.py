@@ -25,6 +25,7 @@ from services.career.profile_router import router as profile_router
 from services.career.router import router as career_router
 from services.suggestions.router import router as suggestions_router
 from services.contact.router import router as contact_router
+from services.payments.router import router as payments_router
 
 settings = get_settings()
 
@@ -260,6 +261,7 @@ def create_app() -> FastAPI:
     app.include_router(career_router)
     app.include_router(suggestions_router)
     app.include_router(contact_router)
+    app.include_router(payments_router)
 
     @app.on_event("startup")
     async def install_asyncio_handlers() -> None:
