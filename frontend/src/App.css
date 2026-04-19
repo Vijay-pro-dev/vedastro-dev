@@ -920,6 +920,10 @@ box-shadow:0 6px 15px rgba(0,0,0,0.2);
   padding: 34px 16px 44px;
 }
 
+.landing .hero.hero-logged-in + .features {
+  margin-top: 15px;
+}
+
 .landing .features h2 {
   margin: 0 auto 22px;
   max-width: 920px;
