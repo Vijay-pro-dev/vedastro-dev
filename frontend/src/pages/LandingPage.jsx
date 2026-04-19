@@ -1,17 +1,28 @@
 ﻿import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
+  FaBolt,
   FaChartLine,
   FaClock,
   FaChevronDown,
+  FaCogs,
+  FaComments,
+  FaExchangeAlt,
   FaEye,
   FaEyeSlash,
   FaFacebookF,
+  FaHeart,
   FaInstagram,
+  FaLayerGroup,
   FaLightbulb,
+  FaLock,
+  FaShieldAlt,
   FaSignOutAlt,
+  FaShoppingBag,
   FaTimes,
   FaUser,
+  FaUserPlus,
+  FaUsers,
 } from "react-icons/fa"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
@@ -57,6 +68,14 @@ function LandingPage() {
 
   const activeLanguageLabel =
     languageOptions.find((option) => option.value === activeLanguage)?.label || "English (UK)"
+  const activeLanguageShort =
+    {
+      english: "EN",
+      hindi: "HI",
+      french: "FR",
+      german: "DE",
+      arabic: "AR",
+    }[activeLanguage] || "EN"
 
   const resetAuthForm = () => {
     setFormState({
@@ -238,12 +257,60 @@ function LandingPage() {
   return (
     <div className="landing">
       <nav className="navbar">
-        <h2 className="logo">Vedastro</h2>
+        <div className="landing-brand" role="button" tabIndex={0} onClick={() => navigate("/")}>
+          <span className="landing-brand-badge" aria-hidden="true">
+            <FaLayerGroup />
+          </span>
+          <span className="logo">Vedastro</span>
+        </div>
 
         <div className="navbar-actions">
+          {user && (
+            <button
+              type="button"
+              className="landing-nav-cta"
+              onClick={() => {
+                setShowLanguageDropdown(false)
+                setShowProfileDropdown(false)
+                navigate(isAdmin ? "/admin-panel" : "/dashboard")
+              }}
+            >
+              Dashboard
+            </button>
+          )}
+
+          {user && (
+            <button
+              type="button"
+              className="landing-nav-cta landing-nav-profile"
+              onClick={() => {
+                setShowLanguageDropdown(false)
+                setShowProfileDropdown(false)
+                navigate("/profile")
+              }}
+            >
+              Profile
+            </button>
+          )}
+
+          {!user && (
+            <button
+              type="button"
+              className="landing-nav-login"
+              onClick={() => {
+                resetAuthForm()
+                setShowLoginModal(true)
+              }}
+            >
+              Login
+            </button>
+          )}
           <div className="landing-language-menu" ref={languageMenuRef}>
             <button type="button" className="landing-language-btn" onClick={() => setShowLanguageDropdown((value) => !value)}>
-                <span className="landing-language-value">{activeLanguageLabel}</span>
+                <span className="landing-language-value landing-language-value--full">{activeLanguageLabel}</span>
+                <span className="landing-language-value landing-language-value--short" aria-hidden="true">
+                  {activeLanguageShort}
+                </span>
                 <FaChevronDown size={14} />
               </button>
 
@@ -276,7 +343,8 @@ function LandingPage() {
                   setShowProfileDropdown((value) => !value)
                 }}
               >
-                <FaUser size={18} /> {user.name || user.email?.split("@")[0]}
+                <FaUser size={18} />
+                <span className="profile-btn-label">{user.name || user.email?.split("@")[0]}</span>
               </button>
 
               {showProfileDropdown && (
@@ -313,17 +381,7 @@ function LandingPage() {
                 </div>
               )}
             </div>
-          ) : (
-            <button
-              className="login-btn"
-              onClick={() => {
-                setShowLanguageDropdown(false)
-                setShowLoginModal(true)
-              }}
-            >
-              Login
-            </button>
-          )}
+          ) : null}
         </div>
       </nav>
 
@@ -484,41 +542,154 @@ function LandingPage() {
           )}
 
           {user && (
-            <div className="hero-actions">
-              <button
-                className="btn primary"
-                onClick={() => {
-                  setShowLanguageDropdown(false)
-                  navigate(isAdmin ? "/admin-panel" : "/dashboard")
-                }}
-              >
-                {isAdmin ? "Admin Panel" : pageT.dashboard}
-              </button>
-              <button className="btn secondary" onClick={() => navigate("/profile")}>
-                {pageT.profile}
-              </button>
+            <div className="landing-welcome" aria-label="Welcome">
+              <div className="landing-welcome-title">Welcome to Vedastro</div>
+              <div className="landing-welcome-subtitle">
+                {user.name ? `Good to see you, ${user.name}.` : "Good to see you again."}
+              </div>
             </div>
           )}
+
         </div>
       </section>
 
       <section className="features">
         <h2>{pageT.builtFor}</h2>
-        <div className="feature-grid">
-          <div className="feature">
-            <FaChartLine size={30} color="#4a6cf7" />
-            <h3>{pageT.dynamicScore}</h3>
-            <p>{pageT.dynamicScoreSub}</p>
+          <div className="feature-grid">
+            <div className="feature">
+              <FaChartLine size={30} color="#d6b34a" />
+              <h3>{pageT.dynamicScore}</h3>
+              <p>{pageT.dynamicScoreSub}</p>
+            </div>
+            <div className="feature">
+              <FaClock size={30} color="#d6b34a" />
+              <h3>{pageT.savedWindow}</h3>
+              <p>{pageT.savedWindowSub}</p>
+            </div>
+            <div className="feature">
+              <FaLightbulb size={30} color="#d6b34a" />
+              <h3>{pageT.aiRecommendations}</h3>
+              <p>{pageT.aiRecommendationsSub}</p>
+            </div>
           </div>
-          <div className="feature">
-            <FaClock size={30} color="#4a6cf7" />
-            <h3>{pageT.savedWindow}</h3>
-            <p>{pageT.savedWindowSub}</p>
+        </section>
+
+      <section className="landing-section landing-section-emphasis" aria-labelledby="landing-proof-heading">
+        <div className="landing-section-inner">
+          <h2 id="landing-proof-heading">Not Advice. Not Generic Motivation.</h2>
+          <p className="landing-section-subtitle">
+            Built using behavioral signals, pattern recognition, and timing intelligence models. Helps users pause bad decisions and act at better
+            moments.
+          </p>
+
+          <div className="landing-tile-grid" role="list">
+            <div className="landing-tile" role="listitem">
+              <span className="landing-tile-icon" aria-hidden="true">
+                <FaShieldAlt />
+              </span>
+              <span className="landing-tile-label">Data Encrypted</span>
+            </div>
+            <div className="landing-tile" role="listitem">
+              <span className="landing-tile-icon" aria-hidden="true">
+                <FaCogs />
+              </span>
+              <span className="landing-tile-label">Pattern Engine</span>
+            </div>
+            <div className="landing-tile" role="listitem">
+              <span className="landing-tile-icon" aria-hidden="true">
+                <FaBolt />
+              </span>
+              <span className="landing-tile-label">Real-time Analysis</span>
+            </div>
+            <div className="landing-tile" role="listitem">
+              <span className="landing-tile-icon" aria-hidden="true">
+                <FaLock />
+              </span>
+              <span className="landing-tile-label">Private &amp; Secure</span>
+            </div>
           </div>
-          <div className="feature">
-            <FaLightbulb size={30} color="#4a6cf7" />
-            <h3>{pageT.aiRecommendations}</h3>
-            <p>{pageT.aiRecommendationsSub}</p>
+        </div>
+      </section>
+
+      <section className="landing-section" aria-labelledby="landing-traps-heading">
+        <div className="landing-section-inner">
+          <h2 id="landing-traps-heading">Why Smart People Still Make Bad Decisions</h2>
+          <p className="landing-section-subtitle">Intelligence alone doesn&apos;t protect you from these three traps.</p>
+
+          <div className="landing-card-grid" role="list">
+            <article className="landing-card" role="listitem">
+              <span className="landing-card-icon" aria-hidden="true">
+                <FaEyeSlash />
+              </span>
+              <h3>Clarity</h3>
+              <p>You can&apos;t see clearly. Fog in your judgment distorts what feels like a good choice.</p>
+            </article>
+            <article className="landing-card" role="listitem">
+              <span className="landing-card-icon" aria-hidden="true">
+                <FaBolt />
+              </span>
+              <h3>Behavior</h3>
+              <p>You react emotionally or impulsively. Speed without awareness compounds errors.</p>
+            </article>
+            <article className="landing-card" role="listitem">
+              <span className="landing-card-icon" aria-hidden="true">
+                <FaClock />
+              </span>
+              <h3>Timing</h3>
+              <p>Even good moves fail when timing is wrong. The right action at the wrong moment costs you.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-section" aria-labelledby="landing-usecases-heading">
+        <div className="landing-section-inner">
+          <h2 id="landing-usecases-heading">Use Vedastro Before Decisions Like:</h2>
+          <p className="landing-section-subtitle">When stakes are high, guessing is expensive.</p>
+
+          <div className="landing-usecase-grid" role="list">
+            <div className="landing-usecase" role="listitem">
+              <span className="landing-usecase-icon" aria-hidden="true">
+                <FaChartLine />
+              </span>
+              <span className="landing-usecase-label">Investing money</span>
+            </div>
+            <div className="landing-usecase" role="listitem">
+              <span className="landing-usecase-icon" aria-hidden="true">
+                <FaExchangeAlt />
+              </span>
+              <span className="landing-usecase-label">Switching jobs</span>
+            </div>
+            <div className="landing-usecase" role="listitem">
+              <span className="landing-usecase-icon" aria-hidden="true">
+                <FaHeart />
+              </span>
+              <span className="landing-usecase-label">Starting a relationship</span>
+            </div>
+            <div className="landing-usecase" role="listitem">
+              <span className="landing-usecase-icon" aria-hidden="true">
+                <FaUsers />
+              </span>
+              <span className="landing-usecase-label">Business partnership</span>
+            </div>
+            <div className="landing-usecase" role="listitem">
+              <span className="landing-usecase-icon" aria-hidden="true">
+                <FaUserPlus />
+              </span>
+              <span className="landing-usecase-label">Hiring someone</span>
+            </div>
+            <div className="landing-usecase" role="listitem">
+              <span className="landing-usecase-icon" aria-hidden="true">
+                <FaShoppingBag />
+              </span>
+              <span className="landing-usecase-label">Major purchases</span>
+            </div>
+            <div className="landing-usecase landing-usecase-wide" role="listitem">
+              <span className="landing-usecase-icon" aria-hidden="true">
+                <FaComments />
+              </span>
+              <span className="landing-usecase-label">Difficult conversations</span>
+            </div>
           </div>
         </div>
       </section>
@@ -553,15 +724,7 @@ function LandingPage() {
               >
                 Start Free Analysis
               </button>
-              {user ? (
-                <button
-                  type="button"
-                  className="landing-footer-link"
-                  onClick={() => navigate(isAdmin ? "/admin-panel" : "/dashboard")}
-                >
-                  {isAdmin ? "Admin Panel" : "Dashboard"}
-                </button>
-              ) : (
+              {!user && (
                 <button type="button" className="landing-footer-link" onClick={() => navigate("/login")}>
                   Login
                 </button>
@@ -573,9 +736,11 @@ function LandingPage() {
 
             <div className="landing-footer-col">
               <div className="landing-footer-title">Product</div>
-              <button type="button" className="landing-footer-link" onClick={() => navigate("/profile")}>
-                Profile
-              </button>
+              {!user && (
+                <button type="button" className="landing-footer-link" onClick={() => navigate("/profile")}>
+                  Profile
+                </button>
+              )}
               <button type="button" className="landing-footer-link" onClick={() => navigate("/suggestions")}>
                 Suggestions
               </button>

@@ -458,7 +458,7 @@ function UserForm() {
 
   if (loading) {
     return (
-      <div className="page-container">
+      <div className="user-form-container">
         <div className="skeleton-card">
           <div className="skeleton-line" />
           <div className="skeleton-line" />
