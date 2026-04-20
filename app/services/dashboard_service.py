@@ -12,7 +12,7 @@ def calculate_age(dob: str | None) -> int:
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 
-def awareness_score(goal_clarity: str, role_match: str) -> int:
+def awareness_score(goal_clarity: str | None, role_match: str | None) -> int:
     if (goal_clarity or "medium").lower() == "high" and (role_match or "medium").lower() == "high":
         return 85
     if (goal_clarity or "medium").lower() == "medium" or (role_match or "medium").lower() == "medium":

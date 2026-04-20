@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from datetime import timedelta
 
+from typing import cast
+
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
@@ -14,11 +16,13 @@ def utc_now() -> datetime:
 
 
 def is_payment_active(payment: ReportPayment) -> bool:
-    if payment.status != "paid":
+    status = cast(str | None, getattr(payment, "status", None))
+    if status != "paid":
         return False
-    if payment.expires_at is None:
+    expires_at = cast(datetime | None, getattr(payment, "expires_at", None))
+    if expires_at is None:
         return True
-    return payment.expires_at >= utc_now()
+    return expires_at >= utc_now()
 
 
 def has_paid_report(db: Session, user_id: int, product_key: str) -> bool:
@@ -50,9 +54,10 @@ def _expiry_for_plan(plan_key: str) -> datetime | None:
 
 
 def mark_payment_paid(db: Session, payment: ReportPayment, razorpay_payment_id: str) -> None:
-    payment.status = "paid"
-    payment.razorpay_payment_id = razorpay_payment_id
-    payment.expires_at = _expiry_for_plan(payment.plan_key)
-    payment.updated_at = utc_now()
+    setattr(payment, "status", "paid")
+    setattr(payment, "razorpay_payment_id", razorpay_payment_id)
+    plan_key = cast(str | None, getattr(payment, "plan_key", None))
+    setattr(payment, "expires_at", _expiry_for_plan(plan_key or "one_time"))
+    setattr(payment, "updated_at", utc_now())
     db.add(payment)
     db.commit()

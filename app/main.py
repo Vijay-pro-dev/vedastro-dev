@@ -10,9 +10,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.requests import Request
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -209,10 +211,19 @@ def ensure_bootstrap_admin() -> None:
 def initialize_application_state() -> None:
     configure_logging()
     Path(settings.uploads_dir).mkdir(parents=True, exist_ok=True)
-    run_migrations_if_enabled()
-    ensure_sqlite_columns()
-    Base.metadata.create_all(bind=engine)
-    ensure_bootstrap_admin()
+    try:
+        run_migrations_if_enabled()
+        ensure_sqlite_columns()
+        Base.metadata.create_all(bind=engine)
+        ensure_bootstrap_admin()
+    except OperationalError:
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+        logging.getLogger("vedastro.startup").exception("Database unavailable during startup.")
+        if not settings.debug and settings.app_env.strip().lower() in {"production", "prod"}:
+            raise
 
 
 def install_windows_asyncio_connection_reset_suppression() -> None:
@@ -244,6 +255,20 @@ def create_app() -> FastAPI:
         debug=settings.debug,
         description="Vedastro career guidance SaaS API with JWT auth, profile persistence, admin tooling, and AI-style dashboard insights.",
     )
+
+    @app.exception_handler(OperationalError)
+    async def database_unavailable(_: Request, __: OperationalError) -> JSONResponse:
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Database unavailable. Check your internet/DNS and DATABASE_URL.",
+            },
+        )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allow_origins,

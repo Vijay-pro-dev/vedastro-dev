@@ -39,6 +39,7 @@ class PdfTextLine:
     font_size: int = 12
     bold: bool = False
     align: str = "left"  # left|center
+    indent: int = 0
     leading: int | None = None
 
 
@@ -184,6 +185,392 @@ def build_text_pdf(lines: list[PdfTextLine], *, spec: PdfPageSpec | None = None)
     return _serialize_pdf(objects)
 
 
+def build_ai_report_pdf(report_text: str, *, spec: PdfPageSpec | None = None) -> bytes:
+    """Generate a structured, readable PDF from an AI report text blob.
+
+    Keeps output ASCII-only to avoid PDF base-font encoding surprises
+    (e.g. emoji/bullets turning into '?').
+    """
+
+    spec = spec or PdfPageSpec(margin=50, font_size=11, leading=16, max_chars=102)
+
+    def sanitize(text: str) -> str:
+        if not isinstance(text, str):
+            return ""
+
+        replacements = {
+            "\u2019": "'",
+            "\u2018": "'",
+            "\u201c": '"',
+            "\u201d": '"',
+            "\u2013": "-",
+            "\u2014": "-",
+            "\u2026": "...",
+            "\u2022": "-",
+            "\u00a0": " ",
+            "â€™": "'",
+            "â€˜": "'",
+            "â€œ": '"',
+            "â€\u009d": '"',
+            "â€“": "-",
+            "â€”": "-",
+            "â€¦": "...",
+            "â€¢": "-",
+            "â‚¹": "INR",
+            "Â": "",
+        }
+        for bad, good in replacements.items():
+            text = text.replace(bad, good)
+
+        text = "".join(ch if (32 <= ord(ch) < 127) or ch in {"\n", "\t"} else " " for ch in text)
+        return "\n".join(line.rstrip() for line in text.splitlines())
+
+    def max_chars_for(font_size: int, indent_points: int) -> int:
+        base = max(20, int(spec.max_chars * (12 / max(1, int(font_size)))))
+        indent_chars = int(indent_points / max(1.0, float(font_size) * 0.52))
+        return max(20, base - indent_chars)
+
+    def wrap_line(text: str, *, font_size: int, indent: int, hanging: bool = False) -> list[tuple[str, int]]:
+        text = sanitize(text).strip()
+        if not text:
+            return [("", 0)]
+
+        width = max_chars_for(font_size, indent)
+        wrapped = textwrap.wrap(text, width=width, replace_whitespace=False, drop_whitespace=False)
+        if not wrapped:
+            return [("", 0)]
+        if not hanging:
+            return [(w, indent) for w in wrapped]
+
+        out: list[tuple[str, int]] = []
+        for i, w in enumerate(wrapped):
+            out.append((w, indent if i == 0 else indent + 14))
+        return out
+
+    raw = sanitize(report_text or "")
+    input_lines = [line.strip() for line in raw.splitlines()]
+
+    first_non_empty = next((ln for ln in input_lines if ln), "")
+    has_title = "VEDASTRO" in first_non_empty.upper() and "REPORT" in first_non_empty.upper()
+
+    styled: list[PdfTextLine] = []
+
+    def add_blank(height: int = 10) -> None:
+        styled.append(PdfTextLine(text="", font_size=spec.font_size, leading=height))
+
+    if has_title:
+        styled.append(PdfTextLine(text=first_non_empty.upper(), font_size=18, bold=True, align="center", leading=28))
+        add_blank(6)
+        input_lines = input_lines[1:]
+
+    for line in input_lines:
+        if not line:
+            add_blank(10)
+            continue
+
+        upper = line.upper()
+        is_section = (
+            (upper == line and len(line) <= 56 and any(c.isalpha() for c in line))
+            or (line.endswith(":") and len(line) <= 38 and " " in line)
+        )
+
+        if is_section:
+            label = line.rstrip(":").strip()
+            add_blank(8)
+            styled.append(PdfTextLine(text=label, font_size=13, bold=True, leading=20))
+            add_blank(2)
+            continue
+
+        is_numbered = bool(len(line) >= 2 and line[0].isdigit() and line[1] in {".", ")"})
+        is_bullet = line.startswith(("-", "*", "•")) or is_numbered
+
+        if is_bullet:
+            clean = line
+            if clean.startswith(("•", "*")):
+                clean = "- " + clean[1:].lstrip()
+            for wrapped, indent in wrap_line(clean, font_size=11, indent=14, hanging=True):
+                styled.append(PdfTextLine(text=wrapped, font_size=11, indent=indent, leading=16))
+            continue
+
+        for wrapped, indent in wrap_line(line, font_size=11, indent=0):
+            styled.append(PdfTextLine(text=wrapped, font_size=11, indent=indent, leading=16))
+
+    while styled and styled[-1].text == "":
+        styled.pop()
+
+    return build_text_pdf(styled, spec=spec)
+
+
+def build_ai_report_pdf_pro(report_text: str, *, spec: PdfPageSpec | None = None) -> bytes:
+    """Generate a professional, colored PDF from an AI report text blob.
+
+    Adds a branded header, section chips, spacing, and visual "icons" drawn as shapes.
+    Output is kept ASCII-only to avoid PDF base-font encoding surprises.
+    """
+
+    spec = spec or PdfPageSpec(margin=46, font_size=11, leading=16, max_chars=102)
+
+    def sanitize(text: str) -> str:
+        if not isinstance(text, str):
+            return ""
+
+        replacements = {
+            "\u2019": "'",
+            "\u2018": "'",
+            "\u201c": '"',
+            "\u201d": '"',
+            "\u2013": "-",
+            "\u2014": "-",
+            "\u2026": "...",
+            "\u2022": "-",
+            "\u00a0": " ",
+            "Ã¢â‚¬â„¢": "'",
+            "Ã¢â‚¬Ëœ": "'",
+            "Ã¢â‚¬Å“": '"',
+            "Ã¢â‚¬\u009d": '"',
+            "Ã¢â‚¬â€œ": "-",
+            "Ã¢â‚¬â€": "-",
+            "Ã¢â‚¬Â¦": "...",
+            "Ã¢â‚¬Â¢": "-",
+            "Ã¢â€šÂ¹": "INR",
+            "Ã‚": "",
+        }
+        for bad, good in replacements.items():
+            text = text.replace(bad, good)
+
+        text = "".join(ch if (32 <= ord(ch) < 127) or ch in {"\n", "\t"} else " " for ch in text)
+        return "\n".join(line.rstrip() for line in text.splitlines())
+
+    def is_header(line: str) -> bool:
+        line = (line or "").strip()
+        if not line:
+            return False
+        upper = line.upper()
+        if upper == line and len(line) <= 60 and any(c.isalpha() for c in line):
+            return True
+        if line.endswith(":") and len(line) <= 38 and " " in line:
+            return True
+        return False
+
+    def wrap_to_width(text: str, *, font_size: int, max_width: float) -> list[str]:
+        text = (text or "").strip()
+        if not text:
+            return [""]
+        words = text.split()
+        out: list[str] = []
+        current = ""
+        for word in words:
+            candidate = word if not current else f"{current} {word}"
+            if _estimate_text_width(candidate, font_size) <= max_width or not current:
+                current = candidate
+                continue
+            out.append(current)
+            current = word
+        if current:
+            out.append(current)
+        return out
+
+    raw = sanitize(report_text or "")
+    lines = [ln.strip() for ln in raw.splitlines()]
+
+    title = next((ln for ln in lines if ln), "VEDASTRO INSIGHTS REPORT")
+    if "VEDASTRO" not in title.upper() or "REPORT" not in title.upper():
+        title = "VEDASTRO INSIGHTS REPORT"
+
+    sections: list[tuple[str, list[str]]] = []
+    for ln in lines:
+        if not ln:
+            if sections:
+                sections[-1][1].append("")
+            continue
+        if is_header(ln):
+            header = ln.rstrip(":").strip().upper()
+            if "VEDASTRO" in header and "REPORT" in header:
+                title = header
+                continue
+            sections.append((header, []))
+            continue
+        if not sections:
+            sections.append(("REPORT", []))
+        sections[-1][1].append(ln)
+
+    meta_name = ""
+    meta_date = ""
+    for s_title, s_lines in sections:
+        if s_title == "PROFILE":
+            for ln in s_lines:
+                lower = ln.lower()
+                if lower.startswith("name:"):
+                    meta_name = ln.split(":", 1)[1].strip()
+                if lower.startswith("date:"):
+                    meta_date = ln.split(":", 1)[1].strip()
+            break
+
+    bg = (0.973, 0.980, 0.988)
+    card = (1.0, 1.0, 1.0)
+    border = (0.86, 0.89, 0.93)
+    ink = (0.07, 0.10, 0.15)
+    muted = (0.40, 0.45, 0.52)
+    navy = (0.05, 0.08, 0.16)
+    accent = (0.96, 0.73, 0.20)  # amber
+    sky = (0.22, 0.74, 0.98)
+    violet = (0.62, 0.40, 0.93)
+
+    def section_color(name: str) -> tuple[float, float, float]:
+        name = (name or "").upper()
+        if "SCORE" in name or "INDEX" in name:
+            return sky
+        if "ENERGY" in name:
+            return violet
+        if "VERDICT" in name:
+            return accent
+        return accent
+
+    objects: list[bytes] = []
+
+    def add_obj(payload: bytes) -> int:
+        objects.append(payload)
+        return len(objects)
+
+    add_obj(b"<< /Type /Catalog /Pages 2 0 R >>")
+    kids_placeholder = b"__KIDS__"
+    pages_obj_index = add_obj(b"<< /Type /Pages /Kids " + kids_placeholder + b" /Count __COUNT__ >>")
+    font_regular = add_obj(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    font_bold = add_obj(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>")
+
+    page_obj_indices: list[int] = []
+
+    def new_canvas() -> PdfCanvas:
+        c = PdfCanvas(spec=spec, lines=[])
+        c.set_fill_rgb(*bg)
+        c.rect(0, 0, spec.width, spec.height, fill=True, stroke=False)
+        return c
+
+    def draw_page_header(c: PdfCanvas, *, page_no: int) -> float:
+        header_h = 78
+        c.set_fill_rgb(*navy)
+        c.rect(0, spec.height - header_h, spec.width, header_h, fill=True, stroke=False)
+        c.set_fill_rgb(*accent)
+        c.rect(spec.margin, spec.height - header_h + 18, 56, 4, fill=True, stroke=False)
+
+        c.text_center("VEDASTRO", y=spec.height - 36, size=16, bold=True, color=(1, 1, 1))
+        c.text_center("Insights Report", y=spec.height - 56, size=10, bold=False, color=(0.85, 0.89, 0.94))
+
+        meta_parts = []
+        if meta_name:
+            meta_parts.append(meta_name)
+        if meta_date:
+            meta_parts.append(meta_date)
+        meta = " | ".join(meta_parts) if meta_parts else ""
+        if meta:
+            c.text(meta, x=spec.margin, y=spec.height - header_h + 10, size=9, bold=False, color=(0.78, 0.82, 0.88))
+
+        page_label = f"Page {page_no}"
+        c.text(
+            page_label,
+            x=spec.width - spec.margin - _estimate_text_width(page_label, 9),
+            y=spec.margin - 18,
+            size=9,
+            bold=False,
+            color=muted,
+        )
+
+        return spec.height - header_h - 18
+
+    def draw_section_header(c: PdfCanvas, section_title: str, *, y_top: float) -> float:
+        color = section_color(section_title)
+        c.set_fill_rgb(*card)
+        c.set_stroke_rgb(*border)
+        c.set_line_width(1.0)
+        c.round_rect(spec.margin, y_top - 32, spec.width - 2 * spec.margin, 34, 12, fill=True, stroke=True)
+        c.set_fill_rgb(*color)
+        c.round_rect(spec.margin + 14, y_top - 24, 10, 10, 5, fill=True, stroke=False)
+        c.text(section_title, x=spec.margin + 32, y=y_top - 20, size=12, bold=True, color=ink)
+        return y_top - 44
+
+    def commit_page(c: PdfCanvas) -> None:
+        content = "\n".join(c.lines).encode("latin-1", errors="replace")
+        content_stream = b"<< /Length " + str(len(content)).encode("ascii") + b" >>\nstream\n" + content + b"\nendstream"
+        content_obj = add_obj(content_stream)
+        page_dict = (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "
+            + str(spec.width).encode("ascii")
+            + b" "
+            + str(spec.height).encode("ascii")
+            + b"] /Resources << /Font << /F1 "
+            + str(font_regular).encode("ascii")
+            + b" 0 R /F2 "
+            + str(font_bold).encode("ascii")
+            + b" 0 R >> >> /Contents "
+            + str(content_obj).encode("ascii")
+            + b" 0 R >>"
+        )
+        page_obj = add_obj(page_dict)
+        page_obj_indices.append(page_obj)
+
+    page_no = 1
+    canvas = new_canvas()
+    y_cursor = draw_page_header(canvas, page_no=page_no)
+    content_w = spec.width - 2 * spec.margin
+
+    def ensure_space(min_needed: float) -> None:
+        nonlocal canvas, y_cursor, page_no
+        if y_cursor - min_needed >= spec.margin + 28:
+            return
+        commit_page(canvas)
+        page_no += 1
+        canvas = new_canvas()
+        y_cursor = draw_page_header(canvas, page_no=page_no)
+
+    for sec_title, sec_lines in sections:
+        if not sec_title or sec_title == "REPORT":
+            continue
+
+        ensure_space(70)
+        y_cursor = draw_section_header(canvas, sec_title, y_top=y_cursor)
+
+        for ln in sec_lines:
+            if not ln:
+                y_cursor -= 8
+                continue
+
+            is_numbered = bool(len(ln) >= 2 and ln[0].isdigit() and ln[1] in {".", ")"})
+            is_bullet = ln.startswith(("-", "*")) or is_numbered
+
+            if is_bullet:
+                text = ln.lstrip("*").strip()
+                indent_x = 24
+                max_w = content_w - indent_x
+                wrapped = wrap_to_width(text, font_size=10, max_width=max_w)
+                for idx, row in enumerate(wrapped):
+                    ensure_space(22)
+                    if idx == 0:
+                        col = section_color(sec_title)
+                        canvas.set_fill_rgb(*col)
+                        canvas.round_rect(spec.margin + 10, y_cursor - 10, 6, 6, 3, fill=True, stroke=False)
+                    canvas.text(row, x=spec.margin + indent_x, y=y_cursor - 12, size=10, bold=False, color=muted)
+                    y_cursor -= 14
+                continue
+
+            wrapped = wrap_to_width(ln, font_size=10, max_width=content_w)
+            for row in wrapped:
+                ensure_space(20)
+                canvas.text(row, x=spec.margin + 2, y=y_cursor - 12, size=10, bold=False, color=muted)
+                y_cursor -= 14
+
+        y_cursor -= 10
+
+    commit_page(canvas)
+
+    kids = b"[ " + b" ".join(f"{idx} 0 R".encode("ascii") for idx in page_obj_indices) + b" ]"
+    pages_obj_payload = objects[pages_obj_index - 1]
+    pages_obj_payload = pages_obj_payload.replace(kids_placeholder, kids)
+    pages_obj_payload = pages_obj_payload.replace(b"__COUNT__", str(len(page_obj_indices)).encode("ascii"))
+    objects[pages_obj_index - 1] = pages_obj_payload
+
+    return _serialize_pdf(objects)
+
+
 def _build_page_content(lines: list[str], spec: PdfPageSpec) -> bytes:
     parts: list[str] = []
     parts.append("BT")
@@ -222,7 +609,7 @@ def _build_positioned_page_content(lines: list[PdfTextLine], spec: PdfPageSpec, 
         if (line.align or "left").lower() == "center":
             x = max(spec.margin, int((spec.width - width) / 2))
         else:
-            x = spec.margin
+            x = spec.margin + int(line.indent or 0)
 
         escaped = _pdf_escape(text)
         parts.append(f"/{font_ref} {font_size} Tf")
@@ -375,11 +762,15 @@ def build_professional_report_pdf(payload: dict, *, spec: PdfPageSpec | None = N
             return str(int(n))
         return f"{n:.1f}"
 
-    user = payload.get("user") if isinstance(payload.get("user"), dict) else {}
+    user_obj = payload.get("user")
+    user = user_obj if isinstance(user_obj, dict) else {}
     generated_at = str(payload.get("generated_at") or "").strip() or "Not available"
-    scores = payload.get("scores") if isinstance(payload.get("scores"), dict) else {}
-    rule_matches = payload.get("rule_matches") if isinstance(payload.get("rule_matches"), list) else []
-    sections = payload.get("sections") if isinstance(payload.get("sections"), dict) else {}
+    scores_obj = payload.get("scores")
+    scores = scores_obj if isinstance(scores_obj, dict) else {}
+    rule_matches_obj = payload.get("rule_matches")
+    rule_matches = rule_matches_obj if isinstance(rule_matches_obj, list) else []
+    sections_obj = payload.get("sections")
+    sections = sections_obj if isinstance(sections_obj, dict) else {}
 
     # Colors (modern, high-contrast)
     bg = (0.965, 0.973, 0.985)

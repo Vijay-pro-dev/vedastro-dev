@@ -94,7 +94,12 @@ class Settings:
     report_yearly_price_paise: int = int(os.getenv("REPORT_YEARLY_PRICE_PAISE", "49900"))
     report_monthly_price_cents: int = int(os.getenv("REPORT_MONTHLY_PRICE_CENTS", "1999"))
     report_yearly_price_cents: int = int(os.getenv("REPORT_YEARLY_PRICE_CENTS", "9999"))
+    report_downloads_per_week: int = int(os.getenv("REPORT_DOWNLOADS_PER_WEEK", "4"))
+    report_download_window_days: int = int(os.getenv("REPORT_DOWNLOAD_WINDOW_DAYS", "7"))
     payment_force_currency: str = os.getenv("PAYMENT_FORCE_CURRENCY", "").strip().upper()
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "").strip()
+    openai_report_enabled: bool = _env_bool("OPENAI_REPORT_ENABLED", False)
+    openai_report_model: str = os.getenv("OPENAI_REPORT_MODEL", "gpt-5.4").strip()
 
     def __post_init__(self) -> None:
         if self.secret_key_fallbacks is None:

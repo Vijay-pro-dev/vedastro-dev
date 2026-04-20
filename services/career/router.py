@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -12,8 +13,10 @@ from services.auth.router import get_current_user
 from app.services.dashboard_service import build_dashboard
 from app.services.profile_service import build_profile, get_latest_birth_data, get_latest_career_profile
 from app.services.payment_service import has_paid_report
-from app.services.pdf_service import build_professional_report_pdf
+from app.services.openai_report_service import OpenAIReportRequest, generate_report_text_via_openai
+from app.services.pdf_service import build_ai_report_pdf, build_ai_report_pdf_pro, build_professional_report_pdf, build_simple_pdf
 from app.core.config import get_settings
+from app.services.report_download_service import enforce_report_download_quota, log_report_download
 
 
 router = APIRouter(tags=["dashboard"])
@@ -129,58 +132,131 @@ def full_report(current_user: models.User = Depends(get_current_user), db: Sessi
 
 
 @router.get("/career/report/pdf")
-def full_report_pdf(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Download a simple PDF version of the full report (based on NewDashboard data)."""
-    if not has_paid_report(db, current_user.id, settings.report_product_key):
-        raise HTTPException(status_code=402, detail="Payment required")
+def full_report_pdf(
+    engine: str = Query(default="v2"),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Download the AI-generated report PDF (alias of /career/report/ai/pdf)."""
+    return ai_report_pdf(engine=engine, payload=None, current_user=current_user, db=db)
 
-    # Reuse the same sources the NewDashboard relies on.
+
+def _default_openai_report_payload(current_user: models.User, db: Session) -> dict:
     alignment_payload = latest_alignment(current_user=current_user, db=db)
-    responses_payload = latest_responses(current_user=current_user, db=db)
     rules_payload = latest_rules(current_user=current_user, db=db)
 
     alignment = alignment_payload.get("alignment") if isinstance(alignment_payload, dict) else {}
-    responses = (responses_payload.get("responses") if isinstance(responses_payload, dict) else []) or []
-    rules = (rules_payload.get("rules") if isinstance(rules_payload, dict) else []) or []
     scores = (rules_payload.get("scores") if isinstance(rules_payload, dict) else {}) or {}
 
-    user = {
-        "id": getattr(current_user, "id", None),
-        "name": getattr(current_user, "name", None),
-        "email": getattr(current_user, "email", None),
+    def g(d: dict, key: str) -> Any:
+        return d.get(key) if isinstance(d, dict) else None
+
+    user_name = getattr(current_user, "name", None)
+    report_date = datetime.utcnow().strftime("%d %b %Y")
+
+    return {
+        "name": user_name or "User",
+        "report_date": report_date,
+        "mode": "Career Guidance",
+        "core_scores": {
+            "awareness": g(alignment, "awareness_score"),
+            "clarity": g(scores, "clarity"),
+            "action_power": g(alignment, "action_integrity_score"),
+            "stability": g(scores, "earth"),
+            "opportunity_readiness": g(scores, "opportunity") or g(alignment, "time_alignment_score"),
+        },
+        "elements": {
+            "earth": g(scores, "earth"),
+            "fire": g(scores, "fire"),
+            "air": g(scores, "air"),
+            "water": g(scores, "water"),
+            "space": g(scores, "space"),
+        },
+        "energy": {
+            "mental": g(scores, "clarity"),
+            "emotional": g(scores, "emotional"),
+            "physical": g(alignment, "action_integrity_score"),
+            "spiritual": g(scores, "space"),
+        },
     }
 
-    primary_rule = rules[0] if isinstance(rules, list) and rules else None
-    rule_insight = (primary_rule.get("insight") or primary_rule.get("customer_message")) if primary_rule else None
-    rule_action = (primary_rule.get("next_move") or primary_rule.get("alternative") or primary_rule.get("customer_message")) if primary_rule else None
-    rule_risk = primary_rule.get("risk") if primary_rule else None
-    rule_mistake = primary_rule.get("mistake") if primary_rule else None
 
-    report_payload = {
-        "user": {"name": user.get("name"), "email": user.get("email")},
-        "generated_at": datetime.utcnow().isoformat() + "Z",
-        "scores": {
-            "overall": alignment.get("overall_score"),
-            # Match NewDashboard "Alignment Snapshot" cards:
-            # Awareness (Clarity), Time (Opportunity), Action (Execution)
-            "awareness": alignment.get("awareness_score"),
-            "time": alignment.get("time_alignment_score"),
-            "action": alignment.get("action_integrity_score"),
-        },
-        "rule_matches": [r.get("rule_name") for r in rules[:5] if isinstance(r, dict) and r.get("rule_name")],
-        "sections": {
-            "insights": (str(rule_insight).strip() if rule_insight else ""),
-            "action": (str(rule_action).strip() if rule_action else ""),
-            "mistake": (str(rule_mistake).strip() if rule_mistake else ""),
-            "risk": (str(rule_risk).strip() if rule_risk else ""),
-        },
+@router.api_route("/career/report/ai", methods=["GET", "POST"])
+def ai_report(
+    engine: str = Query(default="v2"),
+    payload: dict | None = Body(default=None),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate an AI-written report (requires OPENAI_API_KEY + OPENAI_REPORT_ENABLED)."""
+    if not has_paid_report(db, current_user.id, settings.report_product_key):
+        raise HTTPException(status_code=402, detail="Payment required")
+
+    engine_norm = (engine or "v2").strip().lower()
+    if engine_norm not in {"v1", "v2", "v3"}:
+        raise HTTPException(status_code=400, detail="Invalid engine. Use v1, v2, or v3.")
+
+    user_data = payload if isinstance(payload, dict) else _default_openai_report_payload(current_user, db)
+
+    try:
+        report_text = generate_report_text_via_openai(
+            OpenAIReportRequest(engine=engine_norm, user_data=user_data),
+            settings,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        detail = str(e) if settings.debug else "Failed to generate AI report"
+        raise HTTPException(status_code=500, detail=detail) from e
+
+    return {"engine": engine_norm, "report_text": report_text, "input": user_data}
+
+
+@router.api_route("/career/report/ai/pdf", methods=["GET", "POST"])
+def ai_report_pdf(
+    engine: str = Query(default="v2"),
+    payload: dict | None = Body(default=None),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Download the AI-written report as a simple text PDF."""
+    if not has_paid_report(db, current_user.id, settings.report_product_key):
+        raise HTTPException(status_code=402, detail="Payment required")
+
+    engine_norm = (engine or "v2").strip().lower()
+    if engine_norm not in {"v1", "v2", "v3"}:
+        raise HTTPException(status_code=400, detail="Invalid engine. Use v1, v2, or v3.")
+
+    quota = enforce_report_download_quota(
+        db,
+        user_id=current_user.id,
+        report_kind="career_ai_pdf",
+        limit=settings.report_downloads_per_week,
+        window_days=settings.report_download_window_days,
+    )
+
+    report = ai_report(engine=engine_norm, payload=payload, current_user=current_user, db=db)
+    report_text = report.get("report_text") if isinstance(report, dict) else None
+    if not isinstance(report_text, str) or not report_text.strip():
+        raise HTTPException(status_code=502, detail="Failed to generate report text")
+
+    pdf_bytes = build_ai_report_pdf_pro(report_text)
+    try:
+        log_report_download(db, user_id=current_user.id, report_kind="career_ai_pdf")
+    except Exception:
+        pass
+
+    remaining_after = max(0, int(quota.remaining) - 1)
+    headers = {
+        "Content-Disposition": f"attachment; filename=vedastro-report-{engine_norm}.pdf",
+        "X-Report-Downloads-Limit": str(quota.limit),
+        "X-Report-Downloads-Remaining": str(remaining_after),
+        "X-Report-Downloads-Window-Days": str(quota.window_days),
     }
-
-    pdf_bytes = build_professional_report_pdf(report_payload)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=vedastro-report.pdf"},
+        headers=headers,
     )
 
 
@@ -299,28 +375,45 @@ def latest_alignment(current_user: models.User = Depends(get_current_user), db: 
 
 @router.get("/career/rules/latest", response_model=dict)
 def latest_rules(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+  match_source = "matched"
   sql = text(
     """
-    WITH element_scores AS (
+    WITH element_raw AS (
       SELECT
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'fire'  THEN es.avg_score END), 0) AS fire,
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'earth' THEN es.avg_score END), 0) AS earth,
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'air'   THEN es.avg_score END), 0) AS air,
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'water' THEN es.avg_score END), 0) AS water,
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'space' THEN es.avg_score END), 0) AS space
-      FROM element_score es
-      JOIN master_element me ON me.id = es.element_id
-      WHERE es.user_id = :uid
+        q.element_id,
+        CAST(ROUND(SUM(ur.score_obtained) / 5.0) AS INTEGER) AS avg_score
+      FROM user_responses ur
+      JOIN master_questions q ON q.question_id = ur.question_id
+      WHERE ur.user_id = :uid AND q.element_id IS NOT NULL
+      GROUP BY q.element_id
+    ),
+    element_scores AS (
+      SELECT
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%fire%'  THEN er.avg_score END), 0) AS fire,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%earth%' THEN er.avg_score END), 0) AS earth,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%air%'   THEN er.avg_score END), 0) AS air,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%water%' THEN er.avg_score END), 0) AS water,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%space%' THEN er.avg_score END), 0) AS space
+      FROM element_raw er
+      JOIN master_element me ON me.id = er.element_id
+    ),
+    energy_raw AS (
+      SELECT
+        q.energy_id,
+        CAST(ROUND(SUM(ur.score_obtained) / 5.0) AS INTEGER) AS avg_score
+      FROM user_responses ur
+      JOIN master_questions q ON q.question_id = ur.question_id
+      WHERE ur.user_id = :uid AND q.energy_id IS NOT NULL
+      GROUP BY q.energy_id
     ),
     energy_scores AS (
       SELECT
-        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'action'      THEN es.avg_score END), 0) AS action,
-        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'clarity'     THEN es.avg_score END), 0) AS clarity,
-        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'emotional'   THEN es.avg_score END), 0) AS emotional,
-        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'opportunity' THEN es.avg_score END), 0) AS opportunity
-      FROM energy_score es
-      JOIN master_energy en ON en.id = es.energy_id
-      WHERE es.user_id = :uid
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) LIKE '%action%' OR lower(trim(en.name)) LIKE '%execution%' THEN er.avg_score END), 0) AS action,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) LIKE '%clarity%' OR lower(trim(en.name)) LIKE '%focus%' THEN er.avg_score END), 0) AS clarity,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) LIKE '%emotional%' OR lower(trim(en.name)) LIKE '%stability%' THEN er.avg_score END), 0) AS emotional,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) LIKE '%opportunity%' OR lower(trim(en.name)) LIKE '%time%' THEN er.avg_score END), 0) AS opportunity
+      FROM energy_raw er
+      JOIN master_energy en ON en.id = er.energy_id
     )
     SELECT r.*
     FROM master_rule r
@@ -340,29 +433,47 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     """
   )
   rows = db.execute(sql, {"uid": current_user.id}).mappings().all()
+  if not rows:
+    match_source = "none"
 
   score_sql = text(
     """
-    WITH element_scores AS (
+    WITH element_raw AS (
       SELECT
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'fire'  THEN es.avg_score END), 0) AS fire,
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'earth' THEN es.avg_score END), 0) AS earth,
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'air'   THEN es.avg_score END), 0) AS air,
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'water' THEN es.avg_score END), 0) AS water,
-        COALESCE(MAX(CASE WHEN lower(trim(me.name)) = 'space' THEN es.avg_score END), 0) AS space
-      FROM element_score es
-      JOIN master_element me ON me.id = es.element_id
-      WHERE es.user_id = :uid
+        q.element_id,
+        CAST(ROUND(SUM(ur.score_obtained) / 5.0) AS INTEGER) AS avg_score
+      FROM user_responses ur
+      JOIN master_questions q ON q.question_id = ur.question_id
+      WHERE ur.user_id = :uid AND q.element_id IS NOT NULL
+      GROUP BY q.element_id
+    ),
+    element_scores AS (
+      SELECT
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%fire%'  THEN er.avg_score END), 0) AS fire,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%earth%' THEN er.avg_score END), 0) AS earth,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%air%'   THEN er.avg_score END), 0) AS air,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%water%' THEN er.avg_score END), 0) AS water,
+        COALESCE(MAX(CASE WHEN lower(trim(me.name)) LIKE '%space%' THEN er.avg_score END), 0) AS space
+      FROM element_raw er
+      JOIN master_element me ON me.id = er.element_id
+    ),
+    energy_raw AS (
+      SELECT
+        q.energy_id,
+        CAST(ROUND(SUM(ur.score_obtained) / 5.0) AS INTEGER) AS avg_score
+      FROM user_responses ur
+      JOIN master_questions q ON q.question_id = ur.question_id
+      WHERE ur.user_id = :uid AND q.energy_id IS NOT NULL
+      GROUP BY q.energy_id
     ),
     energy_scores AS (
       SELECT
-        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'action'      THEN es.avg_score END), 0) AS action,
-        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'clarity'     THEN es.avg_score END), 0) AS clarity,
-        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'emotional'   THEN es.avg_score END), 0) AS emotional,
-        COALESCE(MAX(CASE WHEN lower(trim(en.name)) = 'opportunity' THEN es.avg_score END), 0) AS opportunity
-      FROM energy_score es
-      JOIN master_energy en ON en.id = es.energy_id
-      WHERE es.user_id = :uid
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) LIKE '%action%' OR lower(trim(en.name)) LIKE '%execution%' THEN er.avg_score END), 0) AS action,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) LIKE '%clarity%' OR lower(trim(en.name)) LIKE '%focus%' THEN er.avg_score END), 0) AS clarity,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) LIKE '%emotional%' OR lower(trim(en.name)) LIKE '%stability%' THEN er.avg_score END), 0) AS emotional,
+        COALESCE(MAX(CASE WHEN lower(trim(en.name)) LIKE '%opportunity%' OR lower(trim(en.name)) LIKE '%time%' THEN er.avg_score END), 0) AS opportunity
+      FROM energy_raw er
+      JOIN master_energy en ON en.id = er.energy_id
     )
     SELECT e.fire, e.earth, e.air, e.water, e.space,
            n.action, n.clarity, n.emotional, n.opportunity
@@ -374,4 +485,12 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
   # pydantic/fastapi cannot serialize RowMapping; convert to plain dicts
   rules = [dict(r) for r in rows]
   scores = dict(score_row) if score_row else {}
-  return {"rules": rules, "scores": scores}
+  return {
+    "rules": rules,
+    "scores": scores,
+    "match": {
+      "source": match_source,
+      "matched_count": len(rows) if match_source == "matched" else 0,
+      "returned": len(rules),
+    },
+  }

@@ -55,6 +55,8 @@ function Results() {
   const [apiQuestions, setApiQuestions] = useState(null)
   const [alignment, setAlignment] = useState(null)
   const [rules, setRules] = useState([])
+  const [rulesMatch, setRulesMatch] = useState(null)
+  const [showAllRules, setShowAllRules] = useState(false)
   const [retakeLoading, setRetakeLoading] = useState(false)
   const [showTop, setShowTop] = useState(false)
   const [reportPaid, setReportPaid] = useState(false)
@@ -97,6 +99,7 @@ function Results() {
         }))
         setApiQuestions(qList)
         setRules(respRules.data?.rules || [])
+        setRulesMatch(respRules.data?.match || null)
       } catch (err) {
         console.warn("Could not load responses from API, using local cache", err)
       }
@@ -221,8 +224,16 @@ function Results() {
     { name: "Space", desc: "Vision & Purpose", color: "#9b7bff", Icon: FaRegStar },
   ]
 
-  const topRules = useMemo(() => (rules || []).slice(0, 2), [rules])
-  const primaryRule = topRules[0]
+  const rulesMatched = Boolean(rulesMatch && rulesMatch.source === "matched")
+
+  const visibleRules = useMemo(() => {
+    const list = rulesMatched ? rules || [] : []
+    if (showAllRules) return list
+    return list.slice(0, 2)
+  }, [rules, showAllRules, rulesMatched])
+
+  const topRules = visibleRules
+  const primaryRule = rulesMatched ? topRules[0] : null
   const ruleInsight = primaryRule?.insight || primaryRule?.customer_message
   const ruleAction = primaryRule?.next_move || primaryRule?.alternative || primaryRule?.customer_message
   const ruleWhy = primaryRule?.why || primaryRule?.risk || primaryRule?.mistake || primaryRule?.customer_message
@@ -424,10 +435,11 @@ function Results() {
 
       <div className="results-grid two-col-rule">
         <div className="left-stack">
+          {rulesMatched && (
           <div className="card wide">
             <div className="card-header">
               <h3>Top Rule Matches</h3>
-              <span className="pill dark">{topRules.length} matched</span>
+              <span className="pill dark">{(rules || []).length} matched</span>
             </div>
             <div className="rule-grid">
               {topRules.length ? (
@@ -449,7 +461,20 @@ function Results() {
                 <p className="subtle">No matching rules yet.</p>
               )}
             </div>
+            {(rules || []).length > 2 && (
+              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="pill dark"
+                  onClick={() => setShowAllRules((v) => !v)}
+                  aria-label={showAllRules ? "Show top rules" : "Show all rules"}
+                >
+                  {showAllRules ? "Show Top 2" : `Show All (${(rules || []).length})`}
+                </button>
+              </div>
+            )}
           </div>
+          )}
           <div className="card">
             <h3><span className="card-icon"><Icon d={ICONS.insight} /></span> Insights</h3>
             <ul className="insight-list">
