@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -18,9 +18,16 @@ def _load_environment() -> None:
         "test": "test",
     }.get(current_env, current_env)
 
-    load_dotenv(BASE_DIR / ".env", override=False)
-    # Allow the environment-specific file (.env.dev/.env.prod) to override base defaults.
-    load_dotenv(BASE_DIR / f".env.{env_alias}", override=True)
+    # IMPORTANT:
+    # - On hosting providers (Render, etc.), secrets come from the process environment.
+    # - We should never override already-set env vars with values from committed .env files.
+    # This keeps local convenience while preventing production secrets from being clobbered.
+    base = dotenv_values(BASE_DIR / ".env")
+    layered = {**base, **dotenv_values(BASE_DIR / f".env.{env_alias}")}
+    for key, value in layered.items():
+        if not key or value is None:
+            continue
+        os.environ.setdefault(str(key), str(value))
 
 
 _load_environment()
