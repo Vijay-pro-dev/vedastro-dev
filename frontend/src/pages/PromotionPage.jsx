@@ -20,10 +20,8 @@ import {
   LuUsers,
   LuZap,
 } from "react-icons/lu"
-import { useToast } from "../components/shared/ToastProvider"
 
 function PromotionPage() {
-  const toast = useToast()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -45,10 +43,6 @@ function PromotionPage() {
     elements.forEach((element) => observer.observe(element))
     return () => observer.disconnect()
   }, [])
-
-  const showToast = (message) => {
-    toast.showInfo(message, "Vedastro")
-  }
 
   const goToLanding = () => {
     navigate("/?from=promo")
@@ -90,7 +84,7 @@ function PromotionPage() {
               <span className="text-gold text-xs font-medium tracking-wide uppercase">Decision Intelligence System</span>
             </div>
           </div>
-          <h1 className="fade-up font-sora font-extrabold text-4xl md:text-6xl lg:text-7xl leading-[1.08] tracking-tight mb-6">
+          <h1 className="fade-up font-sora font-semibold text-4xl md:text-6xl lg:text-7xl leading-[1.08] tracking-tight mb-6">
             Before Your Next Big Decision,
             <br />
             <span className="text-gold">Know If You&apos;re About to Make a Mistake.</span>
@@ -99,15 +93,16 @@ function PromotionPage() {
             Vedastro detects when your clarity, behavior, and timing are misaligned — so you can avoid costly decisions.
           </p>
           <div className="fade-up flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
-            <a href="#pricing" className="glow-btn bg-gold text-black font-bold text-base px-8 py-4 rounded-full">
+            <button type="button" onClick={goToLanding} className="glow-btn bg-gold text-black font-bold text-base px-8 py-4 rounded-full">
               Get My Free Insight
-            </a>
-            <a
-              href="#how"
-              className="glow-btn-outline border border-white/20 text-white font-medium text-base px-8 py-4 rounded-full"
+            </button>
+            <button
+              type="button"
+              onClick={goToLanding}
+              className="glow-btn-outline bg-transparent border border-white/20 text-white font-medium text-base px-8 py-4 rounded-full"
             >
               How It Works
-            </a>
+            </button>
           </div>
           <p className="fade-up text-gray4 text-sm">60 seconds · 1 full insight free · No signup needed</p>
 
@@ -275,9 +270,9 @@ function PromotionPage() {
                 <p className="text-white font-medium">High action + low clarity + weak timing detected.</p>
               </div>
             </div>
-            <a href="#pricing" className="glow-btn block text-center bg-gold text-black font-bold py-4 rounded-full text-base">
+            <button type="button" onClick={goToLanding} className="glow-btn block text-center bg-gold text-black font-bold px-8 py-4 rounded-full text-base">
               Get My Result
-            </a>
+            </button>
           </div>
         </div>
       </section>
@@ -331,9 +326,9 @@ function PromotionPage() {
                 </li>
               </ul>
               <button
-                className="glow-btn-outline w-full border border-white/20 text-white font-semibold py-3.5 rounded-full text-base"
+                className="promo-free-btn glow-btn-outline w-full border border-white/20 text-white font-semibold py-3.5 rounded-full text-base"
                 type="button"
-                onClick={() => showToast("Starting your free insight...")}
+                onClick={goToLanding}
               >
                 Start Free
               </button>
@@ -342,7 +337,7 @@ function PromotionPage() {
               <div className="absolute -top-3 right-6 bg-gold text-black text-xs font-bold px-3 py-1 rounded-full">POPULAR</div>
               <p className="text-gold text-sm font-medium uppercase tracking-wider mb-2">Pro</p>
               <p className="font-sora font-bold text-4xl mb-1">
-                ₹499<span className="text-lg text-gray4 font-normal">/mo</span>
+                ₹499<span className="text-lg text-gray4 font-normal">/mo for early users</span>
               </p>
               <p className="text-gray4 text-sm mb-6">
                 <span className="line-through">₹1999/month</span> · 75% off
@@ -364,7 +359,7 @@ function PromotionPage() {
               <button
                 className="glow-btn w-full bg-gold text-black font-bold py-3.5 rounded-full text-base"
                 type="button"
-                onClick={() => showToast("Unlocking Pro access...")}
+                onClick={goToLanding}
               >
                 Unlock Pro
               </button>
@@ -393,9 +388,9 @@ function PromotionPage() {
             <div className="relative">
               <h2 className="font-sora font-bold text-3xl md:text-5xl mb-4">Make Fewer Costly Mistakes</h2>
               <p className="text-gray4 text-lg mb-10">Get clarity before your next move.</p>
-              <a href="#pricing" className="glow-btn inline-block bg-gold text-black font-bold text-lg px-10 py-4 rounded-full">
+              <button type="button" onClick={goToLanding} className="glow-btn inline-block bg-gold text-black font-bold text-lg px-10 py-4 rounded-full">
                 Get My Free Insight Now
-              </a>
+              </button>
             </div>
           </div>
         </div>

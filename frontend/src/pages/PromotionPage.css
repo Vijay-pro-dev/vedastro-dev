@@ -1,5 +1,28 @@
 .promo-page {
   scrollbar-gutter: stable;
+  font-weight: 400;
+}
+
+.promo-page .font-semibold {
+  font-weight: 500 !important;
+}
+
+.promo-page .font-bold {
+  font-weight: 600 !important;
+}
+
+.promo-page .font-extrabold {
+  font-weight: 700 !important;
+}
+
+.promo-page .promo-free-btn {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.promo-page .promo-free-btn:hover {
+  background: rgba(212, 175, 55, 0.08);
+  border-color: rgba(212, 175, 55, 0.5);
 }
 
 .promo-page::-webkit-scrollbar {
@@ -126,4 +149,3 @@
 .stagger-7 {
   transition-delay: 0.7s;
 }
-
