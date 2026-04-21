@@ -218,13 +218,13 @@ body {
 
 /* Landing page wrapper */
 .landing{
-  --landing-bg: #0b0c0d;
+  --landing-bg: #0B0B0B;
   --landing-text: rgba(255, 255, 255, 0.92);
   --landing-muted: rgba(255, 255, 255, 0.66);
-  --landing-card: rgba(255, 255, 255, 0.045);
+  --landing-card:   #141414;
   --landing-border: rgba(255, 255, 255, 0.085);
-  --landing-gold: #d6b34a;
-  --landing-gold-strong: #e4c45a;
+  --landing-gold: #D4AF37;
+  --landing-gold-strong: #B8941f;
 
   text-align:center;
   width: 100%;
