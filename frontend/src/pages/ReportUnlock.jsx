@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import "../tailwind.css"
 
 import { api } from "../lib/api"
 import { loadRazorpay } from "../lib/razorpay"
@@ -157,102 +158,104 @@ function ReportUnlock() {
   }
 
   return (
-    <div className="page-container narrow report-unlock-shell">
-      <div className="card wide report-unlock-card">
-        <div className="card-header">
-          <h3>Unlock Full Report</h3>
-          <span className="pill dark">{paid ? "Unlocked" : "Locked"}</span>
-        </div>
-        <p className="subtle report-unlock-sub">
-          Choose a plan and complete payment to unlock your complete report.
-        </p>
+    <div className="landing">
+      <div className="page-container narrow report-unlock-shell report-unlock-shell--landing">
+        <div className="card wide report-unlock-card">
+          <div className="card-header">
+            <h3>Unlock Full Report</h3>
+            <span className="pill dark">{paid ? "Unlocked" : "Locked"}</span>
+          </div>
+          <p className="subtle report-unlock-sub">Choose a plan and complete payment to unlock your complete report.</p>
 
-        {error && (
-          <p className="subtle report-unlock-error">
-            {error}
-          </p>
-        )}
+          {error && <p className="subtle report-unlock-error">{error}</p>}
 
-        {!paid && (
-          <>
-            <div className="report-plan-grid">
-              {(plans?.length ? plans : [{ plan_key: "monthly", plan_name: "Monthly", duration_days: 30 }, { plan_key: "yearly", plan_name: "Yearly", duration_days: 365 }]).map((plan) => {
-                const key = plan?.plan_key || "monthly"
-                const amount = pricing?.plans?.[key]?.amount
-                const copy = key === "yearly" ? "Best value for ongoing access." : "Best for trying the full report."
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`report-plan-card ${planKey === key ? "selected" : ""}`}
-                    onClick={() => setPlanKey(key)}
-                  >
-                    <div className="report-plan-head">
-                      <div className="report-plan-title">
-                        <strong>{plan?.plan_name || key}</strong>
-                        <span className="report-plan-meta">{plan?.duration_days || (key === "yearly" ? 365 : 30)} days access</span>
+          {!paid && (
+            <>
+              <div className="report-plan-grid">
+                {(plans?.length
+                  ? plans
+                  : [
+                      { plan_key: "monthly", plan_name: "Monthly", duration_days: 30 },
+                      { plan_key: "yearly", plan_name: "Yearly", duration_days: 365 },
+                    ]
+                ).map((plan) => {
+                  const key = plan?.plan_key || "monthly"
+                  const amount = pricing?.plans?.[key]?.amount
+                  const copy = key === "yearly" ? "Best value for ongoing access." : "Best for trying the full report."
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`report-plan-card ${planKey === key ? "selected" : ""}`}
+                      onClick={() => setPlanKey(key)}
+                    >
+                      <div className="report-plan-head">
+                        <div className="report-plan-title">
+                          <strong>{plan?.plan_name || key}</strong>
+                          <span className="report-plan-meta">
+                            {plan?.duration_days || (key === "yearly" ? 365 : 30)} days access
+                          </span>
+                        </div>
+                        {amount != null && <span className="pill dark">{formatMoney(currency, amount)}</span>}
                       </div>
-                      {amount != null && <span className="pill dark">{formatMoney(currency, amount)}</span>}
-                    </div>
-                    <p className="subtle report-plan-copy">{copy}</p>
-                  </button>
-                )
-              })}
-            </div>
+                      <p className="subtle report-plan-copy">{copy}</p>
+                    </button>
+                  )
+                })}
+              </div>
 
+              <div className="report-actions">
+                {planPriceLabel && <span className="pill dark report-selected-pill">Selected: {planPriceLabel}</span>}
+                <div className="report-action-buttons">
+                  <button type="button" className="auth-button report-pay-btn" disabled={loading} onClick={startPayment}>
+                    {loading ? "Starting payment..." : "Pay & Unlock"}
+                  </button>
+                  <button type="button" className="auth-button report-back-btn" onClick={() => navigate("/newdashboard")}>
+                    Back to Dashboard
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {paid && (
             <div className="report-actions">
-              {planPriceLabel && <span className="pill dark report-selected-pill">Selected: {planPriceLabel}</span>}
               <div className="report-action-buttons">
-                <button type="button" className="auth-button report-pay-btn" disabled={loading} onClick={startPayment}>
-                  {loading ? "Starting payment..." : "Pay & Unlock"}
+                <button type="button" className="auth-button report-pay-btn" disabled={loading} onClick={downloadPdf}>
+                  {loading ? "Preparing PDF..." : "Download PDF"}
                 </button>
                 <button type="button" className="auth-button report-back-btn" onClick={() => navigate("/newdashboard")}>
                   Back to Dashboard
                 </button>
+                {fullReport && (
+                  <button
+                    type="button"
+                    className="auth-button report-back-btn"
+                    onClick={() => {
+                      const blob = new Blob([JSON.stringify(fullReport, null, 2)], { type: "application/json" })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement("a")
+                      a.href = url
+                      a.download = "vedastro-report.json"
+                      document.body.appendChild(a)
+                      a.click()
+                      a.remove()
+                      URL.revokeObjectURL(url)
+                    }}
+                  >
+                    Download JSON
+                  </button>
+                )}
               </div>
             </div>
-          </>
-        )}
+          )}
 
-        {paid && (
-          <div className="report-actions">
-            <div className="report-action-buttons">
-              <button type="button" className="auth-button report-pay-btn" disabled={loading} onClick={downloadPdf}>
-                {loading ? "Preparing PDF..." : "Download PDF"}
-              </button>
-              <button type="button" className="auth-button report-back-btn" onClick={() => navigate("/newdashboard")}>
-                Back to Dashboard
-              </button>
-              {fullReport && (
-                <button
-                  type="button"
-                  className="auth-button report-back-btn"
-                  onClick={() => {
-                    const blob = new Blob([JSON.stringify(fullReport, null, 2)], { type: "application/json" })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement("a")
-                    a.href = url
-                    a.download = "vedastro-report.json"
-                    document.body.appendChild(a)
-                    a.click()
-                    a.remove()
-                    URL.revokeObjectURL(url)
-                  }}
-                >
-                  Download JSON
-                </button>
-              )}
+          {paid && fullReport && (
+            <div className="report-preview">
+              <pre className="report-preview-pre">{JSON.stringify(fullReport, null, 2)}</pre>
             </div>
-          </div>
-        )}
-
-        {paid && fullReport && (
-          <div className="report-preview">
-            <pre className="report-preview-pre">
-              {JSON.stringify(fullReport, null, 2)}
-            </pre>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

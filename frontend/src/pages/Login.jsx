@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { FiArrowLeft, FiEye, FiEyeOff, FiLock, FiLogIn, FiMail } from "react-icons/fi"
+import "../tailwind.css"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
@@ -161,9 +162,10 @@ function Login() {
   }, [searchParams, showInfo])
 
   return (
-    <div className="auth-page login-page">
-      <div className="auth-container auth-container-single">
-        <div className="auth-card">
+    <div className="landing">
+      <div className="auth-page login-page auth-page--landing">
+        <div className="auth-container auth-container-single">
+          <div className="auth-card">
           <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
             <FiArrowLeft />
           </button>
@@ -263,6 +265,7 @@ function Login() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   )
 }

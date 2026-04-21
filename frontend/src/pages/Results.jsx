@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { FaArrowLeft, FaArrowUp, FaBolt, FaBrain, FaFire, FaLeaf, FaRegStar, FaTint, FaWind } from "react-icons/fa"
+import "../tailwind.css"
 import { api } from "../lib/api"
 
 const Icon = ({ d }) => (
@@ -299,7 +300,8 @@ function Results() {
   }
 
   return (
-    <div className="results-shell">
+    <div className="landing">
+      <div className="results-shell results-shell--landing">
       <button type="button" className="back-btn" onClick={() => navigate("/", { replace: true })} aria-label="Go back">
         <FaArrowLeft />
       </button>
@@ -537,6 +539,7 @@ function Results() {
           <FaArrowUp />
         </button>
       )}
+      </div>
     </div>
   )
 }

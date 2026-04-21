@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import "../tailwind.css"
 import {
   FaBolt,
   FaChartLine,
@@ -256,7 +257,7 @@ function LandingPage() {
 
   return (
     <div className="landing">
-      <nav className="navbar">
+      <nav className="navbar ">
         <div className="landing-brand" role="button" tabIndex={0} onClick={() => navigate("/")}>
           <span className="landing-brand-badge" aria-hidden="true">
             <FaLayerGroup />
@@ -779,4 +780,3 @@ function LandingPage() {
 }
 
 export default LandingPage
-

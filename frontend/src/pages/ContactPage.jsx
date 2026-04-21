@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import "../tailwind.css"
 import {
   FaArrowLeft,
   FaAt,
@@ -94,13 +95,13 @@ function ContactPage() {
   }
 
   return (
-    <>
+    <div className="landing">
       <div className="contact-page-shell">
-      <div className="contact-page-header">
-        <button type="button" className="contact-back" onClick={() => navigate(-1)} aria-label="Go back">
-          <FaArrowLeft />
-        </button>
-      </div>
+        <div className="contact-page-header">
+          <button type="button" className="contact-back" onClick={() => navigate(-1)} aria-label="Go back">
+            <FaArrowLeft />
+          </button>
+        </div>
 
         <div className="contact-page-card">
           <div className="contact-layout">
@@ -365,7 +366,7 @@ function ContactPage() {
           </div>
         </div>
       </footer>
-    </>
+    </div>
   )
 }
 

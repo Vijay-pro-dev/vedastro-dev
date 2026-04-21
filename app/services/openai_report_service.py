@@ -564,9 +564,11 @@ def _jsonable(value: Any) -> Any:
 
 def generate_report_text_via_openai(req: OpenAIReportRequest, settings: Settings) -> str:
     if not settings.openai_report_enabled:
-        raise RuntimeError("OPENAI_REPORT_ENABLED is false")
+        raise RuntimeError(
+            "OPENAI_REPORT_ENABLED is false. Set OPENAI_REPORT_ENABLED=true in the service environment and restart."
+        )
     if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is missing")
+        raise RuntimeError("OPENAI_API_KEY is missing. Set OPENAI_API_KEY in the service environment and restart.")
 
     engine = (req.engine or "v2").strip().lower()
     if engine not in ENGINE_VERSIONS:
@@ -626,7 +628,11 @@ def generate_report_text_via_openai(req: OpenAIReportRequest, settings: Settings
     except (APITimeoutError, APIConnectionError) as e:
         raise RuntimeError("OpenAI connection failed (network/timeout).") from e
     except BadRequestError as e:
-        raise RuntimeError("OpenAI request rejected (bad request/model mismatch).") from e
+        model = settings.openai_report_model or "<empty>"
+        raise RuntimeError(
+            f"OpenAI request rejected for model '{model}'. This endpoint uses the OpenAI Responses API, "
+            "so OPENAI_REPORT_MODEL must be a Responses-compatible model (the default in render.yaml is gpt-5.4-mini)."
+        ) from e
     except (APIError, OpenAIError) as e:
         raise RuntimeError("OpenAI API error.") from e
 

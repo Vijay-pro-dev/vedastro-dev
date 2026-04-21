@@ -1,6 +1,7 @@
 ﻿import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { FiArrowLeft, FiEye, FiEyeOff, FiLock, FiMail, FiUser, FiUserPlus } from "react-icons/fi"
+import "../tailwind.css"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
@@ -157,20 +158,21 @@ function Signup() {
     passwordStrength < 75 ? "Good" : "Strong"
 
   return (
-    <div className="auth-page signup-page">
-      <div className="auth-container auth-container-single">
-        <div className="auth-card">
-          <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
-            <FiArrowLeft />
-          </button>
-          <div className="auth-header">
-            <h1>{t.createAccount}</h1>
-            <p>{t.createAccountSub}</p>
-          </div>
+    <div className="landing">
+      <div className="auth-page signup-page auth-page--landing">
+        <div className="auth-container auth-container-single">
+          <div className="auth-card">
+            <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+              <FiArrowLeft />
+            </button>
+            <div className="auth-header">
+              <h1>{t.createAccount}</h1>
+              <p>{t.createAccountSub}</p>
+            </div>
 
-          {error && <div className="error-message">{error}</div>}
+            {error && <div className="error-message">{error}</div>}
 
-          <form onSubmit={handleSignup} className="auth-form">
+            <form onSubmit={handleSignup} className="auth-form">
             <div className="form-group">
               <label className="form-label">{t.nationality}</label>
               <select
@@ -280,12 +282,13 @@ function Signup() {
             <button type="submit" className="auth-button" disabled={isLoading}>
               {isLoading ? t.creatingAccount : <><FiUserPlus /> {t.signUp}</>}
             </button>
-          </form>
+            </form>
 
-          <div className="auth-footer">
-            <p>
-              {t.alreadyHaveAccount} <Link to="/login">{t.loginHere}</Link>
-            </p>
+            <div className="auth-footer">
+              <p>
+                {t.alreadyHaveAccount} <Link to="/login">{t.loginHere}</Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>

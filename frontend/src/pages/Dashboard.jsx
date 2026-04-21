@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { FaArrowLeft, FaArrowUp, FaTimes } from "react-icons/fa"
+import "../tailwind.css"
 import {
   Area,
   AreaChart,
@@ -188,18 +189,20 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <div className="ultra-dashboard">
-        <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
-          <FaArrowLeft />
-        </button>
-        <div className="ultra-grid">
-          {[1, 2, 3, 4].map((item) => (
-            <div key={item} className="skeleton-card">
-              <div className="skeleton-line short" />
-              <div className="skeleton-line" />
-              <div className="skeleton-line" />
-            </div>
-          ))}
+      <div className="landing">
+        <div className="ultra-dashboard ultra-dashboard--landing">
+          <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+            <FaArrowLeft />
+          </button>
+          <div className="ultra-grid">
+            {[1, 2, 3, 4].map((item) => (
+              <div key={item} className="skeleton-card">
+                <div className="skeleton-line short" />
+                <div className="skeleton-line" />
+                <div className="skeleton-line" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -207,16 +210,18 @@ function Dashboard() {
 
   if (!data) {
     return (
-      <div className="ultra-dashboard">
-        <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
-          <FaArrowLeft />
-        </button>
-        <div className="empty-state-card">
-          <h3>{t.noDashboardData}</h3>
-          <p>Complete your profile to unlock AI recommendations and score trends.</p>
-          <button className="btn primary" onClick={() => navigate("/form")}>
-            {t.completeProfile}
+      <div className="landing">
+        <div className="ultra-dashboard ultra-dashboard--landing">
+          <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+            <FaArrowLeft />
           </button>
+          <div className="empty-state-card">
+            <h3>{t.noDashboardData}</h3>
+            <p>Complete your profile to unlock AI recommendations and score trends.</p>
+            <button className="btn primary" onClick={() => navigate("/form")}>
+              {t.completeProfile}
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -231,10 +236,11 @@ function Dashboard() {
   ]
 
   return (
-    <div className="ultra-dashboard">
-      <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
-        <FaArrowLeft />
-      </button>
+    <div className="landing">
+      <div className="ultra-dashboard ultra-dashboard--landing">
+        <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+          <FaArrowLeft />
+        </button>
       <div className="dashboard-header">
         <h1>{t.dashboard}</h1>
         <div className="tab-buttons">
@@ -492,6 +498,7 @@ function Dashboard() {
           <FaArrowUp />
         </button>
       )}
+      </div>
     </div>
   )
 }

@@ -120,6 +120,12 @@ services:
         value: admin@gmail.com
       - key: DEFAULT_ADMIN_PASSWORD
         value: admin123
+      - key: OPENAI_REPORT_ENABLED
+        value: "true"
+      - key: OPENAI_REPORT_MODEL
+        value: gpt-5.4-mini
+      - key: OPENAI_API_KEY
+        sync: false
       - key: USE_REDIS_RATE_LIMIT
         value: "false"
 

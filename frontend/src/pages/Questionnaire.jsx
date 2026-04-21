@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import "../tailwind.css"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
@@ -150,11 +151,13 @@ function Questionnaire() {
 
   if (loading) {
     return (
-      <div className="page-container">
-        <div className="skeleton-card">
-          <div className="skeleton-line" />
-          <div className="skeleton-line" />
-          <div className="skeleton-line short" />
+      <div className="landing">
+        <div className="questionnaire-shell questionnaire-shell--landing">
+          <div className="skeleton-card">
+            <div className="skeleton-line" />
+            <div className="skeleton-line" />
+            <div className="skeleton-line short" />
+          </div>
         </div>
       </div>
     )
@@ -172,7 +175,7 @@ function Questionnaire() {
     const idMap = { 1: "fire", 2: "earth", 3: "air", 4: "water", 5: "space" }
     return idMap[elementId] || ""
   })()
-  const elementTheme = (() => {
+  const _elementTheme = (() => {
     const map = {
       fire: { label: "Fire", bg: "linear-gradient(135deg, #ff6a00, #ff9248)", fg: "#fff" },
       earth: { label: "Earth", bg: "linear-gradient(135deg, #4caf50, #7bc043)", fg: "#0b1b0b" },
@@ -184,50 +187,55 @@ function Questionnaire() {
   })()
 
   return (
-    <div className="questionnaire-shell">
-      <div className={`question-window ${elementKey ? `element-${elementKey}` : ""}`}>
-        <div className="window-bar">
-          <button className="window-back" type="button" onClick={() => navigate(-1)} aria-label="Go back">
-            <FiArrowLeft />
-          </button>
-          <span className="dot red" />
-          <span className="dot yellow" />
-          <span className="dot green" />
-          <span className="progress-text">{progressText}</span>
-        </div>
-        <div className="question-body">
-          <p className="question-text">{currentQuestion.question_text}</p>
-          <p className="question-caption">
-            Answer thoughtfully - honest inputs make your guidance sharper.
-          </p>
-          <div className="qa-answers centered">
-            {[1, 2, 3, 4, 5].map((val) => (
-              <label key={val} className={`likert big ${selected === val ? "selected" : ""}`}>
-                <input
-                  type="radio"
-                  name={`q-${currentId}`}
-                  value={val}
-                  checked={selected === val}
-                  onChange={() => handleAnswer(currentId, val)}
-                />
-                {val}
-              </label>
-            ))}
-          </div>
-          <div className="qa-actions spread">
-            <button className="icon-btn secondary" disabled={currentIdx === 0} onClick={handleBack} aria-label="Previous">
+    <div className="landing">
+      <div className="questionnaire-shell questionnaire-shell--landing">
+        <div className={`question-window ${elementKey ? `element-${elementKey}` : ""}`}>
+          <div className="window-bar">
+            <button className="window-back" type="button" onClick={() => navigate(-1)} aria-label="Go back">
               <FiArrowLeft />
             </button>
-            {!isLast && (
-              <button className="icon-btn primary" onClick={handleNext} aria-label="Next" disabled={!selected}>
-                <FiArrowRight />
+            <span className="dot red" />
+            <span className="dot yellow" />
+            <span className="dot green" />
+            <span className="progress-text">{progressText}</span>
+          </div>
+          <div className="question-body">
+            <p className="question-text">{currentQuestion.question_text}</p>
+            <p className="question-caption">Answer thoughtfully - honest inputs make your guidance sharper.</p>
+            <div className="qa-answers centered">
+              {[1, 2, 3, 4, 5].map((val) => (
+                <label key={val} className={`likert big ${selected === val ? "selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name={`q-${currentId}`}
+                    value={val}
+                    checked={selected === val}
+                    onChange={() => handleAnswer(currentId, val)}
+                  />
+                  {val}
+                </label>
+              ))}
+            </div>
+            <div className="qa-actions spread">
+              <button className="icon-btn secondary" disabled={currentIdx === 0} onClick={handleBack} aria-label="Previous">
+                <FiArrowLeft />
               </button>
-            )}
-            {isLast && (
-              <button className="qa-submit-btn" type="button" onClick={() => handleSubmit({ ...answers })} disabled={!selected || submitting}>
-                {submitting ? "Submitting..." : "Submit"}
-              </button>
-            )}
+              {!isLast && (
+                <button className="icon-btn primary" onClick={handleNext} aria-label="Next" disabled={!selected}>
+                  <FiArrowRight />
+                </button>
+              )}
+              {isLast && (
+                <button
+                  className="qa-submit-btn"
+                  type="button"
+                  onClick={() => handleSubmit({ ...answers })}
+                  disabled={!selected || submitting}
+                >
+                  {submitting ? "Submitting..." : "Submit"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
