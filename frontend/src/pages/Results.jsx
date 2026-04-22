@@ -271,6 +271,21 @@ function Results() {
     return entries.map(([name, value]) => ({ name, value: Math.round((value / total) * 100) }))
   }, [elementBreakdown])
 
+  const formatElementUi = (elementName) => {
+    const key = String(elementName || "").trim().toLowerCase()
+    const map = {
+      fire: { label: "Action & Drive", code: "F" },
+      earth: { label: "Stability & Growth", code: "E" },
+      air: { label: "Thinking & Communication", code: "A" },
+      water: { label: "Emotion & Flow", code: "W" },
+      space: { label: "Vision & Purpose", code: "S" },
+    }
+    const picked = map[key]
+    if (picked) return { ...picked, meterClass: key }
+    const code = key ? key.slice(0, 1).toUpperCase() : ""
+    return { label: elementName, code, meterClass: key || "unknown" }
+  }
+
   const elementDonutStyle = useMemo(() => {
     if (!elementList.length) return {}
     const colors = {
@@ -742,9 +757,18 @@ function Results() {
               <ul className="element-list" aria-label="Element list">
                 {elementList.map((item) => (
                   <li key={item.name}>
-                    <span>{item.name}</span>
-                    <div className={`meter ${item.name.toLowerCase()}`} aria-hidden="true"><div style={{ width: `${item.value}%` }} /></div>
-                    <strong>{item.value}%</strong>
+                    {(() => {
+                      const ui = formatElementUi(item.name)
+                      return (
+                        <>
+                          <span>{ui.label}</span>
+                          <div className={`meter ${ui.meterClass}`} aria-hidden="true"><div style={{ width: `${item.value}%` }} /></div>
+                          <strong>
+                            {item.value}%({ui.code})
+                          </strong>
+                        </>
+                      )
+                    })()}
                   </li>
                 ))}
                 {!elementList.length && <li className="subtle">No element data yet.</li>}
