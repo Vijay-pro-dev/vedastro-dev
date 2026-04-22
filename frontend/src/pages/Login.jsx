@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { FiArrowLeft, FiEye, FiEyeOff, FiLock, FiLogIn, FiMail } from "react-icons/fi"
+import { FiArrowLeft, FiEye, FiEyeOff, FiLock, FiLogIn, FiMail, FiX } from "react-icons/fi"
 import "../tailwind.css"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
@@ -175,7 +175,7 @@ function Login() {
             aria-label="Close"
             onClick={() => navigate(-1)}
           >
-            Ã—
+            <FiX aria-hidden />
           </button>
           <div className="auth-header">
             <h1>{t.welcomeBack}</h1>

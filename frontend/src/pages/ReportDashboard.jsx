@@ -73,6 +73,7 @@ function ReportDashboard() {
   const [error, setError] = useState("")
   const [planKey, setPlanKey] = useState(null)
   const [engine, setEngine] = useState("v2")
+  const [planResolved, setPlanResolved] = useState(false)
   const [reportText, setReportText] = useState("")
   const [downloading, setDownloading] = useState(false)
 
@@ -86,9 +87,10 @@ function ReportDashboard() {
         setPlanKey(nextPlan)
         const isYearly = String(nextPlan || "").toLowerCase() === "yearly"
         setEngine((prev) => {
-          if (isYearly) return prev === "v1" || prev === "v2" || prev === "v3" ? (prev === "v2" ? "v3" : prev) : "v3"
+          if (isYearly) return prev === "v2" ? "v3" : prev
           return prev === "v3" ? "v2" : prev
         })
+        setPlanResolved(true)
       })
       .catch(() => {})
     return () => {
@@ -99,6 +101,9 @@ function ReportDashboard() {
   useEffect(() => {
     let mounted = true
     const load = async () => {
+      // Avoid a "double fetch": before plan_key resolves we may start at v2,
+      // then switch to v3 for yearly users, which triggers a second request.
+      if (!planResolved) return
       setLoading(true)
       setError("")
       try {
@@ -123,7 +128,7 @@ function ReportDashboard() {
     return () => {
       mounted = false
     }
-  }, [engine])
+  }, [engine, planResolved])
 
   const cards = useMemo(() => {
     const insight = extractSection(reportText, "insight", engine)

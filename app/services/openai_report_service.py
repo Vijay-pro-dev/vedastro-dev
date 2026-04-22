@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
+from pathlib import Path
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -530,13 +532,20 @@ RULES:
 """.strip()
 
 
+_PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts" / "report_engine"
+
+
+@lru_cache(maxsize=16)
 def _prompt_for_engine(engine: str) -> str:
-    engine = (engine or "v2").strip().lower()
-    if engine == "v1":
-        return V1_PROMPT
-    if engine == "v3":
-        return V3_PROMPT
-    return V2_PROMPT
+    normalized = (engine or "v2").strip().lower()
+    if normalized not in ENGINE_VERSIONS:
+        normalized = "v2"
+
+    prompt_path = _PROMPT_DIR / f"{normalized}.txt"
+    try:
+        return prompt_path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError as e:
+        raise RuntimeError(f"Missing prompt file: {prompt_path}") from e
 
 
 @dataclass(frozen=True)
@@ -602,7 +611,7 @@ def generate_report_text_via_openai(req: OpenAIReportRequest, settings: Settings
             model=settings.openai_report_model,
             instructions=system + "\n\nReturn JSON only.",
             input=user_json,
-            temperature=0.4,
+            temperature=0.0,
             max_output_tokens=1200,
             store=False,
             text={

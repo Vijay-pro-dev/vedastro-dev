@@ -25,7 +25,6 @@ router = APIRouter(tags=["dashboard"])
 settings = get_settings()
 
 _WORD_RE = re.compile(r"\S+")
-PDF_REPORT_MAX_WORDS = 700
 
 
 def _trim_to_word_limit(text: str, max_words: int) -> str:
@@ -46,6 +45,127 @@ def _trim_to_word_limit(text: str, max_words: int) -> str:
         return text.strip() + "\n"
 
     return text[:end_idx].rstrip() + "\n"
+
+
+def _pdf_word_limit(engine: str) -> int:
+    normalized = (engine or "v2").strip().lower()
+    if normalized == "v1":
+        return max(1, int(getattr(settings, "report_pdf_word_limit_v1", 300)))
+    if normalized == "v3":
+        return max(1, int(getattr(settings, "report_pdf_word_limit_v3", 700)))
+    return max(1, int(getattr(settings, "report_pdf_word_limit_v2", 500)))
+
+
+def _get_latest_assessment_id(db: Session, user_id: int) -> int | None:
+    row = db.execute(
+        text(
+            """
+            SELECT assessment_id
+            FROM user_assessments
+            WHERE user_id = :uid AND is_latest IS TRUE
+            ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, assessment_id DESC
+            LIMIT 1
+            """
+        ),
+        {"uid": user_id},
+    ).fetchone()
+    return int(row[0]) if row and row[0] is not None else None
+
+
+def _create_new_assessment(db: Session, user_id: int) -> int:
+    now = datetime.utcnow()
+    db.execute(
+        text("UPDATE user_assessments SET is_latest = FALSE, updated_at = :now WHERE user_id = :uid AND is_latest IS TRUE"),
+        {"uid": user_id, "now": now},
+    )
+
+    dialect = db.get_bind().dialect.name
+    if dialect == "postgresql":
+        assessment_id = db.execute(
+            text(
+                """
+                INSERT INTO user_assessments (user_id, is_latest, created_at, updated_at)
+                VALUES (:uid, TRUE, :now, :now)
+                RETURNING assessment_id
+                """
+            ),
+            {"uid": user_id, "now": now},
+        ).scalar_one()
+        return int(assessment_id)
+
+    db.execute(
+        text(
+            """
+            INSERT INTO user_assessments (user_id, is_latest, created_at, updated_at)
+            VALUES (:uid, 1, :now, :now)
+            """
+        ),
+        {"uid": user_id, "now": now},
+    )
+    assessment_id = db.execute(text("SELECT last_insert_rowid()")).scalar_one()
+    return int(assessment_id)
+
+
+def _extract_ai_section(report_text: str, *, key: str, engine: str) -> str:
+    raw = report_text or ""
+    if not raw.strip():
+        return ""
+
+    normalized_engine = (engine or "v2").strip().lower()
+    heading_map = (
+        {
+            "insight": re.compile(r"EXECUTIVE SUMMARY|KEY INSIGHT", re.IGNORECASE),
+            "action": re.compile(r"NEXT BEST MOVE|RESET PROTOCOL|ACTION STEPS", re.IGNORECASE),
+            "why": re.compile(r"CORE PATTERN|WHY THIS IS HAPPENING", re.IGNORECASE),
+            "risk": re.compile(r"RISK ALERTS|BLIND SPOT INDEX", re.IGNORECASE),
+        }
+        if normalized_engine == "v3"
+        else {
+            "insight": re.compile(r"KEY INSIGHT", re.IGNORECASE),
+            "action": re.compile(r"NEXT BEST MOVE|ACTION STEPS", re.IGNORECASE),
+            "why": re.compile(r"WHY THIS IS HAPPENING", re.IGNORECASE),
+            "risk": re.compile(r"RISK ALERTS|BLIND SPOT INDEX", re.IGNORECASE),
+        }
+    )
+    target_re = heading_map.get(key)
+    if not target_re:
+        return ""
+
+    # Find all known headings so we can bound the section.
+    all_headings = [
+        ("insight", heading_map["insight"]),
+        ("action", heading_map["action"]),
+        ("why", heading_map["why"]),
+        ("risk", heading_map["risk"]),
+        ("timing", re.compile(r"TIMING WINDOWS", re.IGNORECASE)),
+        ("elements", re.compile(r"ELEMENT( |AL) BALANCE", re.IGNORECASE)),
+        ("energy", re.compile(r"ENERGY (PROFILE|MAP)", re.IGNORECASE)),
+        ("summary", re.compile(r"EXECUTIVE SUMMARY|CORE SCORES|SCOREBOARD", re.IGNORECASE)),
+        ("verdict", re.compile(r"FINAL VERDICT", re.IGNORECASE)),
+    ]
+
+    positions: list[tuple[str, int]] = []
+    for k, rx in all_headings:
+        m = rx.search(raw)
+        if m:
+            positions.append((k, m.start()))
+    positions.sort(key=lambda item: item[1])
+
+    start = None
+    for k, idx in positions:
+        if k == key:
+            start = idx
+            break
+    if start is None:
+        return ""
+
+    end = next((idx for _, idx in positions if idx > start), len(raw))
+    chunk = raw[start:end].strip()
+    lines = chunk.splitlines()
+
+    heading_line_index = next((i for i, line in enumerate(lines) if target_re.search(line)), -1)
+    body_lines = lines[heading_line_index + 1 :] if heading_line_index >= 0 else lines[1:]
+    return "\n".join(body_lines).strip()
 
 
 class ResponseIn(BaseModel):
@@ -231,6 +351,50 @@ def ai_report(
 
     user_data = payload if isinstance(payload, dict) else _default_openai_report_payload(current_user, db)
 
+    assessment_id: int | None = None
+    try:
+        assessment_id = _get_latest_assessment_id(db, current_user.id)
+    except Exception:
+        assessment_id = None
+
+    if assessment_id is not None:
+        try:
+            cached = (
+                db.execute(
+                    text(
+                        """
+                        SELECT report_id, report_text, insight_text, action_text, why_text, risk_text, is_latest
+                        FROM user_ai_reports
+                        WHERE user_id = :uid
+                          AND assessment_id = :aid
+                          AND engine = :engine
+                        ORDER BY is_latest DESC, updated_at DESC NULLS LAST, created_at DESC NULLS LAST, report_id DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"uid": current_user.id, "aid": assessment_id, "engine": engine_norm},
+                )
+                .mappings()
+                .first()
+            )
+            if cached and isinstance(cached.get("report_text"), str) and cached["report_text"].strip():
+                return {
+                    "engine": engine_norm,
+                    "report_text": cached["report_text"],
+                    "sections": {
+                        "insight": cached.get("insight_text") or "",
+                        "action": cached.get("action_text") or "",
+                        "why": cached.get("why_text") or "",
+                        "risk": cached.get("risk_text") or "",
+                    },
+                    "assessment_id": assessment_id,
+                    "cached": True,
+                    "input": user_data,
+                }
+        except Exception:
+            # If the table doesn't exist yet or query fails, fall through to generation.
+            pass
+
     try:
         report_text = generate_report_text_via_openai(
             OpenAIReportRequest(engine=engine_norm, user_data=user_data),
@@ -242,7 +406,67 @@ def ai_report(
         detail = str(e) if settings.debug else "Failed to generate AI report"
         raise HTTPException(status_code=500, detail=detail) from e
 
-    return {"engine": engine_norm, "report_text": report_text, "input": user_data}
+    insight_text = _extract_ai_section(report_text, key="insight", engine=engine_norm)
+    action_text = _extract_ai_section(report_text, key="action", engine=engine_norm)
+    why_text = _extract_ai_section(report_text, key="why", engine=engine_norm)
+    risk_text = _extract_ai_section(report_text, key="risk", engine=engine_norm)
+
+    if assessment_id is not None:
+        try:
+            now = datetime.utcnow()
+            db.execute(
+                text(
+                    "UPDATE user_ai_reports SET is_latest = FALSE, updated_at = :now WHERE user_id = :uid AND engine = :engine AND is_latest IS TRUE"
+                ),
+                {"uid": current_user.id, "engine": engine_norm, "now": now},
+            )
+            db.execute(
+                text(
+                    """
+                    INSERT INTO user_ai_reports (
+                      user_id, assessment_id, engine, plan_key, model,
+                      report_text, insight_text, action_text, why_text, risk_text,
+                      is_latest, created_at, updated_at
+                    )
+                    VALUES (
+                      :uid, :aid, :engine, :plan_key, :model,
+                      :report_text, :insight_text, :action_text, :why_text, :risk_text,
+                      TRUE, :now, :now
+                    )
+                    """
+                ),
+                {
+                    "uid": current_user.id,
+                    "aid": assessment_id,
+                    "engine": engine_norm,
+                    "plan_key": plan_key or None,
+                    "model": settings.openai_report_model or None,
+                    "report_text": report_text,
+                    "insight_text": insight_text or None,
+                    "action_text": action_text or None,
+                    "why_text": why_text or None,
+                    "risk_text": risk_text or None,
+                    "now": now,
+                },
+            )
+            db.commit()
+        except Exception:
+            # Don't fail the request if persistence isn't available.
+            pass
+
+    return {
+        "engine": engine_norm,
+        "report_text": report_text,
+        "sections": {
+            "insight": insight_text,
+            "action": action_text,
+            "why": why_text,
+            "risk": risk_text,
+        },
+        "assessment_id": assessment_id,
+        "cached": False,
+        "input": user_data,
+    }
 
 
 @router.api_route("/career/report/ai/pdf", methods=["GET", "POST"])
@@ -278,7 +502,8 @@ def ai_report_pdf(
     if not isinstance(report_text, str) or not report_text.strip():
         raise HTTPException(status_code=502, detail="Failed to generate report text")
 
-    report_text = _trim_to_word_limit(report_text, PDF_REPORT_MAX_WORDS)
+    word_limit = _pdf_word_limit(engine_norm)
+    report_text = _trim_to_word_limit(report_text, word_limit)
     pdf_bytes = build_ai_report_pdf_pro(report_text)
     try:
         log_report_download(db, user_id=current_user.id, report_kind="career_ai_pdf")
@@ -305,26 +530,53 @@ def save_responses(payload: ResponsesPayload, current_user: models.User = Depend
     if not payload.answers:
         raise HTTPException(status_code=400, detail="No answers provided")
 
+    assessment_id: int | None = None
+    try:
+        assessment_id = _create_new_assessment(db, current_user.id)
+        # Deactivate previously cached reports so the next report request regenerates for this assessment.
+        try:
+            db.execute(
+                text("UPDATE user_ai_reports SET is_latest = FALSE, updated_at = :now WHERE user_id = :uid AND is_latest IS TRUE"),
+                {"uid": current_user.id, "now": datetime.utcnow()},
+            )
+        except Exception:
+            # Table might not exist on old DBs; ignore and continue.
+            pass
+    except Exception:
+        # If migrations weren't applied yet, fall back to the legacy behavior (no assessment tracking).
+        assessment_id = None
+
     answers_count = len(payload.answers)
 
     mapping = {1: 0, 2: 25, 3: 50, 4: 75, 5: 100}
-    insert_sql = text(
-        """
-        INSERT INTO user_responses (user_id, question_id, answer_numeric, score_obtained)
-        VALUES (:user_id, :question_id, :answer_numeric, :score_obtained)
-        """
-    )
+    if assessment_id is None:
+        insert_sql = text(
+            """
+            INSERT INTO user_responses (user_id, question_id, answer_numeric, score_obtained)
+            VALUES (:user_id, :question_id, :answer_numeric, :score_obtained)
+            """
+        )
+    else:
+        insert_sql = text(
+            """
+            INSERT INTO user_responses (user_id, assessment_id, question_id, answer_numeric, score_obtained)
+            VALUES (:user_id, :assessment_id, :question_id, :answer_numeric, :score_obtained)
+            """
+        )
 
     for item in payload.answers:
         score = mapping.get(item.answer, 0)
+        params = {
+            "user_id": current_user.id,
+            "question_id": item.question_id,
+            "answer_numeric": score,
+            "score_obtained": score,
+        }
+        if assessment_id is not None:
+            params["assessment_id"] = assessment_id
         db.execute(
             insert_sql,
-            {
-                "user_id": current_user.id,
-                "question_id": item.question_id,
-                "answer_numeric": score,
-                "score_obtained": score,
-            },
+            params,
         )
 
     # Let DB-side function handle per-category + overall aggregation (future categories auto-supported)
@@ -340,6 +592,12 @@ def latest_responses(current_user: models.User = Depends(get_current_user), db: 
   Return the most recent set of responses for the current user, joined with question meta so
   the frontend can compute results without relying on local cache.
   """
+  assessment_id: int | None = None
+  try:
+    assessment_id = _get_latest_assessment_id(db, current_user.id)
+  except Exception:
+    assessment_id = None
+
   sql = text(
     """
     SELECT
@@ -355,10 +613,11 @@ def latest_responses(current_user: models.User = Depends(get_current_user), db: 
     JOIN master_questions q ON q.question_id = ur.question_id
     LEFT JOIN master_sections s ON q.section_id = s.id
     WHERE ur.user_id = :uid
+      AND (:aid IS NULL OR ur.assessment_id = :aid)
     ORDER BY ur.created_at DESC, q.display_order ASC
     """
   )
-  rows = db.execute(sql, {"uid": current_user.id}).mappings().all()
+  rows = db.execute(sql, {"uid": current_user.id, "aid": assessment_id}).mappings().all()
   return {"responses": [dict(r) for r in rows]}
 
 
@@ -379,6 +638,12 @@ def latest_alignment(current_user: models.User = Depends(get_current_user), db: 
   """
   Return the latest career alignment snapshot for the current user (computed on the fly).
   """
+  assessment_id: int | None = None
+  try:
+    assessment_id = _get_latest_assessment_id(db, current_user.id)
+  except Exception:
+    assessment_id = None
+
   agg_sql = text(
     """
     WITH base AS (
@@ -387,6 +652,7 @@ def latest_alignment(current_user: models.User = Depends(get_current_user), db: 
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid
+        AND (:aid IS NULL OR ur.assessment_id = :aid)
     )
     SELECT
       AVG(CASE WHEN category_id = 1 THEN score_obtained END) AS awareness_score,
@@ -395,7 +661,7 @@ def latest_alignment(current_user: models.User = Depends(get_current_user), db: 
     FROM base
     """
   )
-  agg = db.execute(agg_sql, {"uid": current_user.id}).mappings().first()
+  agg = db.execute(agg_sql, {"uid": current_user.id, "aid": assessment_id}).mappings().first()
   agg_map = agg or {}
   awareness = agg_map.get("awareness_score")
   time_align = agg_map.get("time_alignment_score")
@@ -416,6 +682,12 @@ def latest_alignment(current_user: models.User = Depends(get_current_user), db: 
 @router.get("/career/rules/latest", response_model=dict)
 def latest_rules(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
   match_source = "matched"
+  assessment_id: int | None = None
+  try:
+    assessment_id = _get_latest_assessment_id(db, current_user.id)
+  except Exception:
+    assessment_id = None
+
   fallback_sql = text(
     """
     WITH element_raw AS (
@@ -425,6 +697,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid AND q.element_id IS NOT NULL
+        AND (:aid IS NULL OR ur.assessment_id = :aid)
       GROUP BY q.element_id
     ),
     element_scores AS (
@@ -444,6 +717,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid AND q.energy_id IS NOT NULL
+        AND (:aid IS NULL OR ur.assessment_id = :aid)
       GROUP BY q.energy_id
     ),
     energy_scores AS (
@@ -475,7 +749,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
   try:
     rows = db.execute(text("SELECT * FROM match_rules(:uid)"), {"uid": current_user.id}).mappings().all()
   except Exception:
-    rows = db.execute(fallback_sql, {"uid": current_user.id}).mappings().all()
+    rows = db.execute(fallback_sql, {"uid": current_user.id, "aid": assessment_id}).mappings().all()
   if not rows:
     match_source = "none"
 
@@ -488,6 +762,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid AND q.element_id IS NOT NULL
+        AND (:aid IS NULL OR ur.assessment_id = :aid)
       GROUP BY q.element_id
     ),
     element_scores AS (
@@ -507,6 +782,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid AND q.energy_id IS NOT NULL
+        AND (:aid IS NULL OR ur.assessment_id = :aid)
       GROUP BY q.energy_id
     ),
     energy_scores AS (
@@ -527,7 +803,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
   try:
     score_row = db.execute(text("SELECT * FROM rule_match_scores(:uid)"), {"uid": current_user.id}).mappings().first()
   except Exception:
-    score_row = db.execute(fallback_score_sql, {"uid": current_user.id}).mappings().first()
+    score_row = db.execute(fallback_score_sql, {"uid": current_user.id, "aid": assessment_id}).mappings().first()
 
   debug_sql = text(
     """
@@ -539,9 +815,10 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     FROM user_responses ur
     JOIN master_questions q ON q.question_id = ur.question_id
     WHERE ur.user_id = :uid
+      AND (:aid IS NULL OR ur.assessment_id = :aid)
     """
   )
-  debug_row = db.execute(debug_sql, {"uid": current_user.id}).mappings().first()
+  debug_row = db.execute(debug_sql, {"uid": current_user.id, "aid": assessment_id}).mappings().first()
   # pydantic/fastapi cannot serialize RowMapping; convert to plain dicts
   rules = [dict(r) for r in rows]
   scores = dict(score_row) if score_row else {}
