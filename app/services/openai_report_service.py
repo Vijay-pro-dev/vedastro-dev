@@ -279,7 +279,7 @@ GOALS:
 - useful actions
 
 OUTPUT LIMIT:
-250-400 words
+150 words
 
 FORMAT:
 - Use plain ASCII only (no emoji, no special bullets).
@@ -337,7 +337,7 @@ GOALS:
 - action oriented
 
 OUTPUT LIMIT:
-400-650 words
+250 words
 
 FORMAT:
 - Use plain ASCII only (no emoji, no special bullets).
@@ -441,7 +441,7 @@ GOALS:
 - practical decision guidance
 
 OUTPUT LIMIT:
-650-950 words
+400 words
 
 FORMAT:
 - Use plain ASCII only (no emoji, no special bullets).

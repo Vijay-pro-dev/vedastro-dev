@@ -761,11 +761,11 @@ function Results() {
                       const ui = formatElementUi(item.name)
                       return (
                         <>
-                          <span>{ui.label}</span>
+                          <span>
+                            {ui.label} ({ui.code})
+                          </span>
                           <div className={`meter ${ui.meterClass}`} aria-hidden="true"><div style={{ width: `${item.value}%` }} /></div>
-                          <strong>
-                            {item.value}%({ui.code})
-                          </strong>
+                          <strong>{item.value}%</strong>
                         </>
                       )
                     })()}
@@ -833,7 +833,7 @@ function Results() {
             <button
               type="button"
               className="nd-report-btn"
-              onClick={() => navigate("/report/unlock")}
+              onClick={() => navigate(reportPaid ? "/report/dashboard" : "/report/unlock")}
               aria-label={reportPaid ? "View full report" : "Upgrade to Pro"}
             >
               <span className="nd-report-btn-ico" aria-hidden="true"><Icon d={ICONS.crown} /></span>

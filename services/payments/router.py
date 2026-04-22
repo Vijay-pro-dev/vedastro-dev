@@ -15,7 +15,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.payment import ReportPayment
 from app.models.subscription import SubscriptionPlan
-from app.services.payment_service import has_paid_report, mark_payment_paid
+from app.services.payment_service import get_active_report_payment, has_paid_report, mark_payment_paid
 from app.services.subscription_service import create_or_update_subscription_for_order, get_or_create_report_plan
 from services.auth.router import get_current_user
 
@@ -90,7 +90,15 @@ class CreateOrderOut(BaseModel):
 @router.get("/payments/report/status")
 def report_status(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     paid = has_paid_report(db, current_user.id, settings.report_product_key)
-    return {"product_key": settings.report_product_key, "paid": paid}
+    payment = get_active_report_payment(db, current_user.id, settings.report_product_key) if paid else None
+    plan_key = getattr(payment, "plan_key", None) if payment is not None else None
+    expires_at = getattr(payment, "expires_at", None) if payment is not None else None
+    return {
+        "product_key": settings.report_product_key,
+        "paid": paid,
+        "plan_key": str(plan_key) if plan_key is not None else None,
+        "expires_at": expires_at.isoformat() + "Z" if expires_at is not None else None,
+    }
 
 
 class SubscriptionPlanOut(BaseModel):

@@ -44,6 +44,31 @@ def has_paid_report(db: Session, user_id: int, product_key: str) -> bool:
     return any(is_payment_active(row) for row in rows)
 
 
+def get_active_report_payment(db: Session, user_id: int, product_key: str) -> ReportPayment | None:
+    """
+    Return the most relevant active paid payment row for the user/product.
+
+    Used to determine plan entitlements (monthly vs yearly) after payment.
+    """
+    rows = (
+        db.query(ReportPayment)
+        .filter(ReportPayment.user_id == user_id)
+        .filter(ReportPayment.product_key == product_key)
+        .filter(ReportPayment.status == "paid")
+        .order_by(
+            desc(ReportPayment.expires_at.is_(None)),  # one-time (no expiry) first
+            desc(ReportPayment.expires_at),
+            desc(ReportPayment.updated_at),
+            desc(ReportPayment.created_at),
+        )
+        .all()
+    )
+    for row in rows:
+        if is_payment_active(row):
+            return row
+    return None
+
+
 def _expiry_for_plan(plan_key: str) -> datetime | None:
     plan = (plan_key or "one_time").strip().lower()
     if plan == "monthly":

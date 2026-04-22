@@ -12,7 +12,7 @@ from app.core.database import get_db
 from services.auth.router import get_current_user
 from app.services.dashboard_service import build_dashboard
 from app.services.profile_service import build_profile, get_latest_birth_data, get_latest_career_profile
-from app.services.payment_service import has_paid_report
+from app.services.payment_service import get_active_report_payment, has_paid_report
 from app.services.openai_report_service import OpenAIReportRequest, generate_report_text_via_openai
 from app.services.pdf_service import build_ai_report_pdf, build_ai_report_pdf_pro, build_professional_report_pdf, build_simple_pdf
 from app.core.config import get_settings
@@ -196,6 +196,11 @@ def ai_report(
     if engine_norm not in {"v1", "v2", "v3"}:
         raise HTTPException(status_code=400, detail="Invalid engine. Use v1, v2, or v3.")
 
+    payment = get_active_report_payment(db, current_user.id, settings.report_product_key)
+    plan_key = (getattr(payment, "plan_key", None) or "").strip().lower() if payment is not None else ""
+    if engine_norm == "v3" and plan_key != "yearly":
+        raise HTTPException(status_code=403, detail="v3 engine requires a yearly plan. Upgrade to Yearly to unlock v3.")
+
     user_data = payload if isinstance(payload, dict) else _default_openai_report_payload(current_user, db)
 
     try:
@@ -226,6 +231,11 @@ def ai_report_pdf(
     engine_norm = (engine or "v2").strip().lower()
     if engine_norm not in {"v1", "v2", "v3"}:
         raise HTTPException(status_code=400, detail="Invalid engine. Use v1, v2, or v3.")
+
+    payment = get_active_report_payment(db, current_user.id, settings.report_product_key)
+    plan_key = (getattr(payment, "plan_key", None) or "").strip().lower() if payment is not None else ""
+    if engine_norm == "v3" and plan_key != "yearly":
+        raise HTTPException(status_code=403, detail="v3 engine requires a yearly plan. Upgrade to Yearly to unlock v3.")
 
     quota = enforce_report_download_quota(
         db,

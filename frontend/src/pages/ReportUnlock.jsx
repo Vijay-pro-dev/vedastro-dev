@@ -22,7 +22,6 @@ function ReportUnlock() {
   const [paid, setPaid] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [fullReport, setFullReport] = useState(null)
 
   useEffect(() => {
     api
@@ -43,9 +42,15 @@ function ReportUnlock() {
 
     api
       .get("/payments/report/status")
-      .then((r) => setPaid(Boolean(r.data?.paid)))
+      .then((r) => {
+        const isPaid = Boolean(r.data?.paid)
+        setPaid(isPaid)
+        if (isPaid) {
+          navigate("/report/dashboard", { replace: true })
+        }
+      })
       .catch(() => {})
-  }, [])
+  }, [navigate])
 
   const currency = pricing?.currency || "INR"
   const planAmount = pricing?.plans?.[planKey]?.amount
@@ -80,6 +85,7 @@ function ReportUnlock() {
             })
             setPaid(true)
             setError("")
+            navigate("/report/dashboard", { replace: true })
           } catch (e) {
             setError(e?.response?.data?.detail || "Payment verification failed.")
           }
@@ -102,60 +108,7 @@ function ReportUnlock() {
     }
   }
 
-  const loadReport = async () => {
-    setError("")
-    setLoading(true)
-    try {
-      const resp = await api.get("/career/report/full")
-      setFullReport(resp.data)
-    } catch (e) {
-      setError(e?.response?.data?.detail || "Failed to load report.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const downloadPdf = async () => {
-    setError("")
-    setLoading(true)
-    try {
-      const resp = await api.get("/career/report/pdf", { responseType: "blob" })
-      const blob = new Blob([resp.data], { type: "application/pdf" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = "vedastro-report.pdf"
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      const status = e?.response?.status
-      const data = e?.response?.data
-      let detail = ""
-
-      if (data && typeof data === "object" && typeof data.detail === "string") {
-        detail = data.detail
-      } else if (data && typeof Blob !== "undefined" && data instanceof Blob) {
-        try {
-          const text = await data.text()
-          try {
-            const parsed = JSON.parse(text)
-            if (parsed && typeof parsed.detail === "string") detail = parsed.detail
-            else detail = text
-          } catch {
-            detail = text
-          }
-        } catch {
-          detail = ""
-        }
-      }
-
-      setError(detail || (status ? `Failed to download PDF (${status}).` : "Failed to download PDF."))
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Paid users are redirected to /report/dashboard, so PDF download stays there.
 
   return (
     <div className="landing">
@@ -220,39 +173,15 @@ function ReportUnlock() {
 
           {paid && (
             <div className="report-actions">
+              <span className="pill dark report-selected-pill">Payment successful</span>
               <div className="report-action-buttons">
-                <button type="button" className="auth-button report-pay-btn" disabled={loading} onClick={downloadPdf}>
-                  {loading ? "Preparing PDF..." : "Download PDF"}
+                <button type="button" className="auth-button report-pay-btn" onClick={() => navigate("/report/dashboard")}>
+                  Open Report Dashboard
                 </button>
                 <button type="button" className="auth-button report-back-btn" onClick={() => navigate("/newdashboard")}>
                   Back to Dashboard
                 </button>
-                {fullReport && (
-                  <button
-                    type="button"
-                    className="auth-button report-back-btn"
-                    onClick={() => {
-                      const blob = new Blob([JSON.stringify(fullReport, null, 2)], { type: "application/json" })
-                      const url = URL.createObjectURL(blob)
-                      const a = document.createElement("a")
-                      a.href = url
-                      a.download = "vedastro-report.json"
-                      document.body.appendChild(a)
-                      a.click()
-                      a.remove()
-                      URL.revokeObjectURL(url)
-                    }}
-                  >
-                    Download JSON
-                  </button>
-                )}
               </div>
-            </div>
-          )}
-
-          {paid && fullReport && (
-            <div className="report-preview">
-              <pre className="report-preview-pre">{JSON.stringify(fullReport, null, 2)}</pre>
             </div>
           )}
         </div>
