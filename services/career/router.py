@@ -381,7 +381,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     WITH element_raw AS (
       SELECT
         q.element_id,
-        CAST(ROUND(SUM(ur.score_obtained) / 5.0) AS INTEGER) AS avg_score
+        CAST(ROUND(AVG(ur.score_obtained)) AS INTEGER) AS avg_score
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid AND q.element_id IS NOT NULL
@@ -400,7 +400,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     energy_raw AS (
       SELECT
         q.energy_id,
-        CAST(ROUND(SUM(ur.score_obtained) / 5.0) AS INTEGER) AS avg_score
+        CAST(ROUND(AVG(ur.score_obtained)) AS INTEGER) AS avg_score
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid AND q.energy_id IS NOT NULL
@@ -420,15 +420,15 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     CROSS JOIN element_scores e
     CROSS JOIN energy_scores n
     WHERE
-      e.fire BETWEEN r.fire_element_low AND r.fire_element_high
-      AND e.earth BETWEEN r.earth_element_low AND r.earth_element_high
-      AND e.air BETWEEN r.air_element_low AND r.air_element_high
-      AND e.water BETWEEN r.water_element_low AND r.water_element_high
-      AND e.space BETWEEN r.space_element_low AND r.space_element_high
-      AND n.action BETWEEN r.action_energy_low AND r.action_energy_high
-      AND n.clarity BETWEEN r.clarity_energy_low AND r.clarity_energy_high
-      AND n.emotional BETWEEN r.emotional_energy_low AND r.emotional_energy_high
-      AND n.opportunity BETWEEN r.opportunity_energy_low AND r.opportunity_energy_high
+      e.fire BETWEEN COALESCE(r.fire_element_low, 0) AND COALESCE(r.fire_element_high, 100)
+      AND e.earth BETWEEN COALESCE(r.earth_element_low, 0) AND COALESCE(r.earth_element_high, 100)
+      AND e.air BETWEEN COALESCE(r.air_element_low, 0) AND COALESCE(r.air_element_high, 100)
+      AND e.water BETWEEN COALESCE(r.water_element_low, 0) AND COALESCE(r.water_element_high, 100)
+      AND e.space BETWEEN COALESCE(r.space_element_low, 0) AND COALESCE(r.space_element_high, 100)
+      AND n.action BETWEEN COALESCE(r.action_energy_low, 0) AND COALESCE(r.action_energy_high, 100)
+      AND n.clarity BETWEEN COALESCE(r.clarity_energy_low, 0) AND COALESCE(r.clarity_energy_high, 100)
+      AND n.emotional BETWEEN COALESCE(r.emotional_energy_low, 0) AND COALESCE(r.emotional_energy_high, 100)
+      AND n.opportunity BETWEEN COALESCE(r.opportunity_energy_low, 0) AND COALESCE(r.opportunity_energy_high, 100)
     ORDER BY r.priority, r.id
     """
   )
@@ -441,7 +441,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     WITH element_raw AS (
       SELECT
         q.element_id,
-        CAST(ROUND(SUM(ur.score_obtained) / 5.0) AS INTEGER) AS avg_score
+        CAST(ROUND(AVG(ur.score_obtained)) AS INTEGER) AS avg_score
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid AND q.element_id IS NOT NULL
@@ -460,7 +460,7 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     energy_raw AS (
       SELECT
         q.energy_id,
-        CAST(ROUND(SUM(ur.score_obtained) / 5.0) AS INTEGER) AS avg_score
+        CAST(ROUND(AVG(ur.score_obtained)) AS INTEGER) AS avg_score
       FROM user_responses ur
       JOIN master_questions q ON q.question_id = ur.question_id
       WHERE ur.user_id = :uid AND q.energy_id IS NOT NULL
@@ -482,12 +482,28 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     """
   )
   score_row = db.execute(score_sql, {"uid": current_user.id}).mappings().first()
+
+  debug_sql = text(
+    """
+    SELECT
+      SUM(CASE WHEN q.element_id IS NOT NULL THEN 1 ELSE 0 END) AS element_tagged_responses,
+      SUM(CASE WHEN q.energy_id IS NOT NULL THEN 1 ELSE 0 END) AS energy_tagged_responses,
+      COUNT(DISTINCT q.element_id) AS distinct_elements_seen,
+      COUNT(DISTINCT q.energy_id) AS distinct_energies_seen
+    FROM user_responses ur
+    JOIN master_questions q ON q.question_id = ur.question_id
+    WHERE ur.user_id = :uid
+    """
+  )
+  debug_row = db.execute(debug_sql, {"uid": current_user.id}).mappings().first()
   # pydantic/fastapi cannot serialize RowMapping; convert to plain dicts
   rules = [dict(r) for r in rows]
   scores = dict(score_row) if score_row else {}
+  debug = dict(debug_row) if debug_row else {}
   return {
     "rules": rules,
     "scores": scores,
+    "debug": debug,
     "match": {
       "source": match_source,
       "matched_count": len(rows) if match_source == "matched" else 0,
