@@ -29,16 +29,19 @@ function ReportUnlock() {
       .then((r) => setPricing(r.data))
       .catch(() => {})
 
-    api
-      .get("/payments/report/plans")
-      .then((r) => {
-        const nextPlans = Array.isArray(r.data) ? r.data : []
-        setPlans(nextPlans)
-        if (nextPlans.length && !nextPlans.some((p) => p?.plan_key === planKey)) {
-          setPlanKey(nextPlans[0]?.plan_key || "monthly")
-        }
-      })
-      .catch(() => {})
+	    api
+	      .get("/payments/report/plans")
+	      .then((r) => {
+	        const nextPlans = Array.isArray(r.data) ? r.data : []
+	        setPlans(nextPlans)
+	        setPlanKey((prev) => {
+	          if (nextPlans.length && !nextPlans.some((p) => p?.plan_key === prev)) {
+	            return nextPlans[0]?.plan_key || "monthly"
+	          }
+	          return prev
+	        })
+	      })
+	      .catch(() => {})
 
     api
       .get("/payments/report/status")

@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, Float, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
@@ -13,31 +16,31 @@ def utc_now() -> datetime:
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    password = Column(String, nullable=False)
-    name = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
-    address = Column(String, nullable=True)
-    nationality = Column(String, default="global")
-    language = Column(String, default="english")
-    role = Column(String, default="user")
-    suspended = Column(Integer, default=0)
-    email_verified = Column(Integer, default=0)
-    email_verification_token = Column(String, nullable=True)
-    password_reset_token = Column(String, nullable=True)
-    password_reset_sent_at = Column(DateTime, nullable=True)
-    failed_login_attempts = Column(Integer, default=0)
-    locked_until = Column(DateTime, nullable=True)
-    refresh_token_version = Column(Integer, default=0)
-    profile_pic = Column(String, nullable=True)
-    user_type_id = Column(Integer, nullable=True)
-    referral_code = Column(String(20), nullable=True)
-    referred_by = Column(BigInteger, nullable=True)
-    is_verified = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utc_now)
-    updated_at = Column(DateTime, default=utc_now)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    password: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    address: Mapped[str | None] = mapped_column(String, nullable=True)
+    nationality: Mapped[str | None] = mapped_column(String, default="global")
+    language: Mapped[str | None] = mapped_column(String, default="english")
+    role: Mapped[str | None] = mapped_column(String, default="user")
+    suspended: Mapped[int | None] = mapped_column(Integer, default=0)
+    email_verified: Mapped[int | None] = mapped_column(Integer, default=0)
+    email_verification_token: Mapped[str | None] = mapped_column(String, nullable=True)
+    password_reset_token: Mapped[str | None] = mapped_column(String, nullable=True)
+    password_reset_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    failed_login_attempts: Mapped[int | None] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    refresh_token_version: Mapped[int | None] = mapped_column(Integer, default=0)
+    profile_pic: Mapped[str | None] = mapped_column(String, nullable=True)
+    user_type_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    referral_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    referred_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    is_verified: Mapped[bool | None] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utc_now)
 
 
 class UserInfo(Base):
@@ -53,17 +56,17 @@ class UserInfo(Base):
 class BirthData(Base):
     __tablename__ = "birth_data"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=True, index=True)
-    name = Column(String)
-    dob = Column(String)
-    birth_time = Column(String)
-    birth_place = Column(String)
-    birth_time_accuracy = Column(String, default="unknown")
-    address = Column(String, nullable=True)
-    profile_pic = Column(String, nullable=True)
-    created_at = Column(DateTime, default=utc_now)
-    updated_at = Column(DateTime, default=utc_now)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    dob: Mapped[str | None] = mapped_column(String, nullable=True)
+    birth_time: Mapped[str | None] = mapped_column(String, nullable=True)
+    birth_place: Mapped[str | None] = mapped_column(String, nullable=True)
+    birth_time_accuracy: Mapped[str | None] = mapped_column(String, default="unknown", nullable=True)
+    address: Mapped[str | None] = mapped_column(String, nullable=True)
+    profile_pic: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utc_now)
 
 
 class BirthTimeEstimate(Base):
@@ -80,17 +83,17 @@ class BirthTimeEstimate(Base):
 class CareerProfile(Base):
     __tablename__ = "career_profiles"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True)
-    education = Column(String)
-    interests = Column(String)
-    goals = Column(String)
-    current_role = Column(String, nullable=True)
-    years_experience = Column(Integer, default=0)
-    goal_clarity = Column(String, default="medium")
-    role_match = Column(String, default="medium")
-    created_at = Column(DateTime, default=utc_now)
-    updated_at = Column(DateTime, default=utc_now)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    education: Mapped[str | None] = mapped_column(String, nullable=True)
+    interests: Mapped[str | None] = mapped_column(String, nullable=True)
+    goals: Mapped[str | None] = mapped_column(String, nullable=True)
+    current_role: Mapped[str | None] = mapped_column(String, nullable=True)
+    years_experience: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
+    goal_clarity: Mapped[str | None] = mapped_column(String, default="medium", nullable=True)
+    role_match: Mapped[str | None] = mapped_column(String, default="medium", nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utc_now)
 
 
 class CareerAlignmentScore(Base):

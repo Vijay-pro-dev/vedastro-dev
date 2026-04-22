@@ -1,3 +1,5 @@
+import re
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
@@ -21,6 +23,29 @@ from app.services.report_download_service import enforce_report_download_quota, 
 
 router = APIRouter(tags=["dashboard"])
 settings = get_settings()
+
+_WORD_RE = re.compile(r"\S+")
+PDF_REPORT_MAX_WORDS = 700
+
+
+def _trim_to_word_limit(text: str, max_words: int) -> str:
+    if not isinstance(text, str) or not text.strip():
+        return ""
+    if max_words <= 0:
+        return ""
+
+    end_idx: int | None = None
+    count = 0
+    for match in _WORD_RE.finditer(text):
+        count += 1
+        if count >= max_words:
+            end_idx = match.end()
+            break
+
+    if end_idx is None:
+        return text.strip() + "\n"
+
+    return text[:end_idx].rstrip() + "\n"
 
 
 class ResponseIn(BaseModel):
@@ -145,11 +170,14 @@ def _default_openai_report_payload(current_user: models.User, db: Session) -> di
     alignment_payload = latest_alignment(current_user=current_user, db=db)
     rules_payload = latest_rules(current_user=current_user, db=db)
 
-    alignment = alignment_payload.get("alignment") if isinstance(alignment_payload, dict) else {}
-    scores = (rules_payload.get("scores") if isinstance(rules_payload, dict) else {}) or {}
+    raw_alignment = alignment_payload.get("alignment") if isinstance(alignment_payload, dict) else None
+    alignment: dict[str, Any] = raw_alignment if isinstance(raw_alignment, dict) else {}
 
-    def g(d: dict, key: str) -> Any:
-        return d.get(key) if isinstance(d, dict) else None
+    raw_scores = rules_payload.get("scores") if isinstance(rules_payload, dict) else None
+    scores: dict[str, Any] = raw_scores if isinstance(raw_scores, dict) else {}
+
+    def g(d: Mapping[str, Any] | None, key: str) -> Any:
+        return d.get(key) if isinstance(d, Mapping) else None
 
     user_name = getattr(current_user, "name", None)
     report_date = datetime.utcnow().strftime("%d %b %Y")
@@ -250,6 +278,7 @@ def ai_report_pdf(
     if not isinstance(report_text, str) or not report_text.strip():
         raise HTTPException(status_code=502, detail="Failed to generate report text")
 
+    report_text = _trim_to_word_limit(report_text, PDF_REPORT_MAX_WORDS)
     pdf_bytes = build_ai_report_pdf_pro(report_text)
     try:
         log_report_download(db, user_id=current_user.id, report_kind="career_ai_pdf")
@@ -367,9 +396,10 @@ def latest_alignment(current_user: models.User = Depends(get_current_user), db: 
     """
   )
   agg = db.execute(agg_sql, {"uid": current_user.id}).mappings().first()
-  awareness = agg.get("awareness_score")
-  time_align = agg.get("time_alignment_score")
-  action = agg.get("action_integrity_score")
+  agg_map = agg or {}
+  awareness = agg_map.get("awareness_score")
+  time_align = agg_map.get("time_alignment_score")
+  action = agg_map.get("action_integrity_score")
   overall_parts = [v for v in [awareness, time_align, action] if v is not None]
   overall = sum(overall_parts) / len(overall_parts) if overall_parts else None
   return {
@@ -386,7 +416,7 @@ def latest_alignment(current_user: models.User = Depends(get_current_user), db: 
 @router.get("/career/rules/latest", response_model=dict)
 def latest_rules(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
   match_source = "matched"
-  sql = text(
+  fallback_sql = text(
     """
     WITH element_raw AS (
       SELECT
@@ -442,11 +472,14 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     ORDER BY r.priority, r.id
     """
   )
-  rows = db.execute(sql, {"uid": current_user.id}).mappings().all()
+  try:
+    rows = db.execute(text("SELECT * FROM match_rules(:uid)"), {"uid": current_user.id}).mappings().all()
+  except Exception:
+    rows = db.execute(fallback_sql, {"uid": current_user.id}).mappings().all()
   if not rows:
     match_source = "none"
 
-  score_sql = text(
+  fallback_score_sql = text(
     """
     WITH element_raw AS (
       SELECT
@@ -491,7 +524,10 @@ def latest_rules(current_user: models.User = Depends(get_current_user), db: Sess
     CROSS JOIN energy_scores n
     """
   )
-  score_row = db.execute(score_sql, {"uid": current_user.id}).mappings().first()
+  try:
+    score_row = db.execute(text("SELECT * FROM rule_match_scores(:uid)"), {"uid": current_user.id}).mappings().first()
+  except Exception:
+    score_row = db.execute(fallback_score_sql, {"uid": current_user.id}).mappings().first()
 
   debug_sql = text(
     """

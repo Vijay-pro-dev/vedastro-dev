@@ -54,9 +54,9 @@ def get_or_create_report_plan(db: Session, plan_key: str) -> SubscriptionPlan:
     if plan:
         if (
             plan.duration_days != definition.duration_days
-            or Decimal(str(plan.price)) != definition.price
+            or plan.price != definition.price
             or (plan.features or {}) != definition.features
-            or plan.is_active is not True
+            or not plan.is_active
         ):
             plan.duration_days = definition.duration_days
             plan.price = definition.price
@@ -99,7 +99,7 @@ def create_or_update_subscription_for_order(
     )
 
     plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.plan_id == plan_id).first()
-    duration_days = int(plan.duration_days) if plan else 30
+    duration_days = plan.duration_days if plan else 30
 
     start = utc_now()
     end = start + timedelta(days=duration_days)

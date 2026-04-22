@@ -20,16 +20,25 @@ const ICONS = {
   risk: "M12 3 3 19h18L12 3Zm0 8v3m0 3h.01",
 }
 
-const extractSection = (text, key) => {
+const extractSection = (text, key, engine = "v2") => {
   const raw = typeof text === "string" ? text : ""
   if (!raw.trim()) return ""
 
-  const headingMap = {
-    insight: /KEY INSIGHT/i,
-    action: /NEXT BEST MOVE|ACTION STEPS/i,
-    why: /WHY THIS IS HAPPENING/i,
-    risk: /RISK ALERTS|BLIND SPOT INDEX/i,
-  }
+  const normalizedEngine = String(engine || "v2").toLowerCase()
+  const headingMap =
+    normalizedEngine === "v3"
+      ? {
+          insight: /EXECUTIVE SUMMARY|KEY INSIGHT/i,
+          action: /NEXT BEST MOVE|RESET PROTOCOL|ACTION STEPS/i,
+          why: /CORE PATTERN|WHY THIS IS HAPPENING/i,
+          risk: /RISK ALERTS|BLIND SPOT INDEX/i,
+        }
+      : {
+          insight: /KEY INSIGHT/i,
+          action: /NEXT BEST MOVE|ACTION STEPS/i,
+          why: /WHY THIS IS HAPPENING/i,
+          risk: /RISK ALERTS|BLIND SPOT INDEX/i,
+        }
 
   const allHeadings = [
     { k: "insight", re: headingMap.insight },
@@ -117,17 +126,17 @@ function ReportDashboard() {
   }, [engine])
 
   const cards = useMemo(() => {
-    const insight = extractSection(reportText, "insight")
-    const action = extractSection(reportText, "action")
-    const why = extractSection(reportText, "why")
-    const risk = extractSection(reportText, "risk")
+    const insight = extractSection(reportText, "insight", engine)
+    const action = extractSection(reportText, "action", engine)
+    const why = extractSection(reportText, "why", engine)
+    const risk = extractSection(reportText, "risk", engine)
     return {
       insight,
       action,
       why,
       risk,
     }
-  }, [reportText])
+  }, [reportText, engine])
 
   const downloadPdf = async () => {
     if (downloading) return
