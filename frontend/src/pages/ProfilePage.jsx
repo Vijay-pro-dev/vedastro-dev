@@ -75,10 +75,8 @@ function ProfilePage() {
       }
     }
 
-    // Profile hydration runs once on mount to mirror saved backend data.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadProfile()
-  }, [])
+  }, [showError, updateUser])
 
   const handleChange = (event) => {
     const { name, value } = event.target

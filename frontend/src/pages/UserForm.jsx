@@ -1,36 +1,204 @@
-import { useEffect, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import BirthTimeQuestionnaire from "../components/profile/BirthTimeQuestionnaire"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
 
+const parseBirthPlace = (rawValue) => {
+  const raw = String(rawValue || "").trim()
+  if (!raw) return { city: "", district: "", country: "" }
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean)
+  if (parts.length >= 3) {
+    const country = parts[parts.length - 1]
+    const district = parts[parts.length - 2]
+    const city = parts.slice(0, -2).join(", ")
+    return { city, district, country }
+  }
+  if (parts.length === 2) {
+    return { city: parts[0], district: "", country: parts[1] }
+  }
+  return { city: parts[0], district: "", country: "" }
+}
+
+function SearchSelect({
+  value,
+  options,
+  onChange,
+  placeholder,
+  disabled,
+  loading,
+  error,
+  allowCustom = true,
+  maxResults = 60,
+  inputName,
+}) {
+  const wrapperRef = useRef(null)
+  const reactId = useId()
+  const listId = `ss-${reactId}`
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const [query, setQuery] = useState("")
+
+  const normalizedQuery = query.trim().toLowerCase()
+  const filtered = useMemo(() => {
+    if (!Array.isArray(options) || options.length === 0) return []
+    if (!normalizedQuery) return options.slice(0, maxResults)
+    return options.filter((opt) => String(opt).toLowerCase().includes(normalizedQuery)).slice(0, maxResults)
+  }, [options, normalizedQuery, maxResults])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const onDocMouseDown = (event) => {
+      if (!wrapperRef.current) return
+      if (wrapperRef.current.contains(event.target)) return
+      setOpen(false)
+      setActiveIndex(-1)
+    }
+    document.addEventListener("mousedown", onDocMouseDown)
+    return () => document.removeEventListener("mousedown", onDocMouseDown)
+  }, [open])
+
+  const commitValue = (nextValue) => {
+    const next = String(nextValue || "")
+    setQuery(next)
+    onChange(next)
+    setOpen(false)
+    setActiveIndex(-1)
+  }
+
+  const onInputChange = (next) => {
+    setQuery(next)
+    if (allowCustom) onChange(next)
+    setOpen(true)
+    setActiveIndex(-1)
+  }
+
+  const onKeyDown = (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault()
+      setOpen(true)
+      setActiveIndex((curr) => Math.min(curr + 1, filtered.length - 1))
+      return
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault()
+      setOpen(true)
+      setActiveIndex((curr) => Math.max(curr - 1, 0))
+      return
+    }
+    if (event.key === "Enter") {
+      if (!open) return
+      event.preventDefault()
+      if (activeIndex >= 0 && activeIndex < filtered.length) {
+        commitValue(filtered[activeIndex])
+      } else if (allowCustom) {
+        commitValue(query)
+      }
+      return
+    }
+    if (event.key === "Escape") {
+      event.preventDefault()
+      setOpen(false)
+      setActiveIndex(-1)
+    }
+  }
+
+  return (
+    <div ref={wrapperRef} style={{ position: "relative" }}>
+      <input
+        name={inputName}
+        className={error ? "input-invalid" : ""}
+        value={open ? query : (value || "")}
+        onChange={(e) => onInputChange(e.target.value)}
+        onFocus={() => {
+          setQuery(value || "")
+          setOpen(true)
+        }}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-invalid={Boolean(error)}
+      />
+
+      {open && !disabled && (
+        <div
+          id={listId}
+          role="listbox"
+          style={{
+            position: "absolute",
+            zIndex: 50,
+            top: "calc(100% + 6px)",
+            left: 0,
+            right: 0,
+            maxHeight: 260,
+            overflowY: "auto",
+            background: "#fff",
+            border: "1px solid rgba(0,0,0,0.12)",
+            borderRadius: 8,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
+          }}
+        >
+          {loading && (
+            <div style={{ padding: "10px 12px", fontSize: 14, opacity: 0.8 }}>
+              Loading...
+            </div>
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <div style={{ padding: "10px 12px", fontSize: 14, opacity: 0.8 }}>
+              No results
+            </div>
+          )}
+
+          {!loading &&
+            filtered.map((opt, idx) => {
+              const isActive = idx === activeIndex
+              return (
+                <div
+                  key={`${opt}-${idx}`}
+                  role="option"
+                  aria-selected={isActive}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onMouseDown={(e) => {
+                    // Prevent blur before selection
+                    e.preventDefault()
+                    commitValue(opt)
+                  }}
+                  style={{
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    background: isActive ? "rgba(59,130,246,0.14)" : "transparent",
+                  }}
+                >
+                  {opt}
+                </div>
+              )
+            })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const LOCATION_API_BASE =
+  import.meta.env.VITE_LOCATION_API_BASE || "https://countriesnow.space/api/v0.1"
+
+const buildLocationUrl = (path) => {
+  const base = String(LOCATION_API_BASE).replace(/\/+$/, "")
+  const cleanedPath = String(path || "").replace(/^\/+/, "")
+  return `${base}/${cleanedPath}`
+}
+
 function UserForm() {
   const navigate = useNavigate()
   const { user, updateUser, t } = useUser()
   const { showError, showSuccess } = useToast()
-  const CITY_OPTIONS = [
-    "Mumbai",
-    "Delhi",
-    "Bengaluru",
-    "Hyderabad",
-    "Chennai",
-    "Kolkata",
-    "Pune",
-    "Ahmedabad",
-    "Jaipur",
-    "Lucknow",
-    "Chandigarh",
-    "Indore",
-    "Bhopal",
-    "Nagpur",
-    "Visakhapatnam",
-    "Surat",
-    "Patna",
-    "Ranchi",
-    "Coimbatore",
-    "Other",
-  ]
   const [currentStep, setCurrentStep] = useState(0)
   const [showQuestionnaire, setShowQuestionnaire] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -49,7 +217,20 @@ function UserForm() {
     birth_place: "",
     birth_time_accuracy: "exact",
   })
-  const [customCity, setCustomCity] = useState("")
+
+  const [birthCountry, setBirthCountry] = useState("India")
+  const [birthDistrict, setBirthDistrict] = useState("")
+  const [birthCity, setBirthCity] = useState("")
+  const [countryOptions, setCountryOptions] = useState([])
+  const [districtOptions, setDistrictOptions] = useState([])
+  const [cityOptions, setCityOptions] = useState([])
+  const [locationLoading, setLocationLoading] = useState({ countries: false, districts: false, cities: false })
+  const [locationError, setLocationError] = useState("")
+  const locationCacheRef = useRef({
+    countries: null,
+    districtsByCountry: {},
+    citiesByCountryDistrict: {},
+  })
   const [careerData, setCareerData] = useState({
     education: "",
     interests: "",
@@ -77,7 +258,7 @@ function UserForm() {
     const trimmed = value.trim()
     if (trimmed.length < 2) return { isValid: false, message: "Current role must be at least 2 characters." }
     if (trimmed.length > 50) return { isValid: false, message: "Current role must be at most 50 characters." }
-    if (!/^[A-Za-z&/ \-]+$/.test(trimmed)) return { isValid: false, message: "Use only letters, spaces, and & / - symbols." }
+    if (!/^[A-Za-z&/ -]+$/.test(trimmed)) return { isValid: false, message: "Use only letters, spaces, and & / - symbols." }
     if (/^[^A-Za-z]*$/.test(trimmed)) return { isValid: false, message: "Current role must contain letters." }
     if (/^[0-9 ]+$/.test(trimmed)) return { isValid: false, message: "Numbers-only role is not allowed." }
     return { isValid: true, message: "Valid" }
@@ -119,11 +300,159 @@ function UserForm() {
 
   const validateAddress = (value) => {
     const trimmed = value.trim()
+    // Address is optional. Validate only when user provides a value.
+    if (!trimmed) return { isValid: true, message: "Valid" }
     if (trimmed.length < 10) return { isValid: false, message: "Address must be at least 10 characters." }
     if (trimmed.length > 200) return { isValid: false, message: "Address must be under 200 characters." }
-    if (!/^[A-Za-z0-9 ,\/-]+$/.test(trimmed)) return { isValid: false, message: "Use letters, numbers, spaces, commas, hyphens, and slashes only." }
+    if (!/^[A-Za-z0-9 ,/-]+$/.test(trimmed)) return { isValid: false, message: "Use letters, numbers, spaces, commas, hyphens, and slashes only." }
     if (/^[0-9 ]+$/.test(trimmed)) return { isValid: false, message: "Address cannot be numbers only." }
     return { isValid: true, message: "Valid" }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    const loadCountries = async () => {
+      if (locationCacheRef.current.countries) {
+        setCountryOptions(locationCacheRef.current.countries)
+        return
+      }
+      setLocationLoading((curr) => ({ ...curr, countries: true }))
+      setLocationError("")
+      try {
+        const response = await fetch(buildLocationUrl("/countries/positions"))
+        const data = await response.json()
+        const list = (data?.data || [])
+          .map((row) => row?.name)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+        if (cancelled) return
+        locationCacheRef.current.countries = list
+        setCountryOptions(list)
+      } catch (error) {
+        console.error("Failed to load countries", error)
+        if (!cancelled) setLocationError("Could not load countries list. Please try again.")
+      } finally {
+        if (!cancelled) setLocationLoading((curr) => ({ ...curr, countries: false }))
+      }
+    }
+    loadCountries()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadDistricts = async () => {
+      const country = birthCountry.trim()
+      if (!country) {
+        setDistrictOptions([])
+        return
+      }
+      if (locationCacheRef.current.districtsByCountry[country]) {
+        setDistrictOptions(locationCacheRef.current.districtsByCountry[country])
+        return
+      }
+      setLocationLoading((curr) => ({ ...curr, districts: true }))
+      setLocationError("")
+      try {
+        const response = await fetch(buildLocationUrl("/countries/states"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ country }),
+        })
+        const data = await response.json()
+        const list = (data?.data?.states || [])
+          .map((row) => row?.name)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+        if (cancelled) return
+        locationCacheRef.current.districtsByCountry[country] = list
+        setDistrictOptions(list)
+      } catch (error) {
+        console.error("Failed to load districts", error)
+        if (!cancelled) setLocationError("Could not load districts/states list. Please type it manually.")
+      } finally {
+        if (!cancelled) setLocationLoading((curr) => ({ ...curr, districts: false }))
+      }
+    }
+    loadDistricts()
+    return () => {
+      cancelled = true
+    }
+  }, [birthCountry])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadCities = async () => {
+      const country = birthCountry.trim()
+      const district = birthDistrict.trim()
+      if (!country || !district) {
+        setCityOptions([])
+        return
+      }
+      if (districtOptions.length > 0 && !districtOptions.includes(district)) {
+        // Avoid calling API for partial/non-matching district while typing.
+        setCityOptions([])
+        return
+      }
+      const cacheKey = `${country}::${district}`
+      if (locationCacheRef.current.citiesByCountryDistrict[cacheKey]) {
+        setCityOptions(locationCacheRef.current.citiesByCountryDistrict[cacheKey])
+        return
+      }
+      setLocationLoading((curr) => ({ ...curr, cities: true }))
+      setLocationError("")
+      try {
+        const response = await fetch(buildLocationUrl("/countries/state/cities"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ country, state: district }),
+        })
+        const data = await response.json()
+        const list = (data?.data || [])
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+        if (cancelled) return
+        locationCacheRef.current.citiesByCountryDistrict[cacheKey] = list
+        setCityOptions(list)
+      } catch (error) {
+        console.error("Failed to load cities", error)
+        if (!cancelled) setLocationError("Could not load cities list. Please type your city manually.")
+      } finally {
+        if (!cancelled) setLocationLoading((curr) => ({ ...curr, cities: false }))
+      }
+    }
+    loadCities()
+    return () => {
+      cancelled = true
+    }
+  }, [birthCountry, birthDistrict, districtOptions])
+
+  useEffect(() => {
+    const composed = [birthCity.trim(), birthDistrict.trim(), birthCountry.trim()].filter(Boolean).join(", ")
+    setFormData((current) => (current.birth_place === composed ? current : { ...current, birth_place: composed }))
+  }, [birthCity, birthDistrict, birthCountry])
+
+  const handleBirthCountryChange = (nextCountry) => {
+    setBirthCountry(nextCountry)
+    setBirthDistrict("")
+    setBirthCity("")
+    setDistrictOptions([])
+    setCityOptions([])
+    setErrors((current) => ({ ...current, birth_country: "", birth_district: "", birth_city: "" }))
+  }
+
+  const handleBirthDistrictChange = (nextDistrict) => {
+    setBirthDistrict(nextDistrict)
+    setBirthCity("")
+    setCityOptions([])
+    setErrors((current) => ({ ...current, birth_district: "", birth_city: "" }))
+  }
+
+  const handleBirthCityChange = (nextCity) => {
+    setBirthCity(nextCity)
+    setErrors((current) => ({ ...current, birth_city: "" }))
   }
 
   useEffect(() => {
@@ -185,12 +514,10 @@ function UserForm() {
           birth_time_accuracy: profile.birth_time_accuracy || "unknown",
         })
         setTimeParts(deriveTimeParts(profile.birth_time))
-        if (profile.birth_place && !CITY_OPTIONS.includes(profile.birth_place)) {
-          setCustomCity(profile.birth_place)
-          setFormData((prev) => ({ ...prev, birth_place: "Other" }))
-        } else {
-          setCustomCity("")
-        }
+        const parsedBirthPlace = parseBirthPlace(profile.birth_place || "")
+        setBirthCountry(parsedBirthPlace.country || "India")
+        setBirthDistrict(parsedBirthPlace.district || "")
+        setBirthCity(parsedBirthPlace.city || "")
         setCareerData({
           education: profile.education || "",
           interests: profile.interests || "",
@@ -210,10 +537,8 @@ function UserForm() {
       setLoading(false)
     }
 
-    // Initial profile bootstrap is intentionally a one-time load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadProfile()
-  }, [])
+  }, [showError])
 
   const validateBirthStep = () => {
     const nextErrors = {}
@@ -237,11 +562,9 @@ function UserForm() {
     } else if (birthTimeKnowledge !== "no" && formData.birth_time && !isValidBirthTime(formData.birth_time)) {
       nextErrors.birth_time = "Enter a valid time (HH:MM)"
     }
-    if (!formData.birth_place.trim()) {
-      nextErrors.birth_place = "Birth place is required."
-    } else if (formData.birth_place === "Other" && !customCity.trim()) {
-      nextErrors.birth_place = "Please enter your city."
-    }
+    if (!birthCountry.trim()) nextErrors.birth_country = "Country is required."
+    if (!birthDistrict.trim()) nextErrors.birth_district = "District/State is required."
+    if (!birthCity.trim()) nextErrors.birth_city = "City is required."
     const addressCheck = validateAddress(formData.address || "")
     if (!addressCheck.isValid) nextErrors.address = addressCheck.message
     setErrors(nextErrors)
@@ -288,11 +611,17 @@ function UserForm() {
 
   const handleFormChange = (event) => {
     const { name, value } = event.target
-    if (name === "birth_place") {
-      setFormData((current) => ({ ...current, [name]: value }))
-      if (value !== "Other") {
-        setCustomCity("")
-      }
+    if (name === "birth_country") {
+      handleBirthCountryChange(value)
+      return
+    }
+    if (name === "birth_district") {
+      handleBirthDistrictChange(value)
+      return
+    }
+    if (name === "birth_city") {
+      handleBirthCityChange(value)
+      return
     } else if (name === "phone") {
       // keep only digits for local part
       const digitsOnly = value.replace(/\D/g, "").slice(0, 10)
@@ -375,7 +704,7 @@ function UserForm() {
       showError("Please fix the highlighted personal profile fields.")
       return
     }
-    const birthPlaceValue = formData.birth_place === "Other" ? customCity.trim() : formData.birth_place
+    const birthPlaceValue = formData.birth_place.trim()
     const token = localStorage.getItem("token")
     const phoneWithCode = `${countryCode}${formData.phone}`
     if (!token) {
@@ -410,7 +739,7 @@ function UserForm() {
       showError("Please fix the highlighted career profile fields.")
       return
     }
-    const birthPlaceValue = formData.birth_place === "Other" ? customCity.trim() : formData.birth_place
+    const birthPlaceValue = formData.birth_place.trim()
     const phoneWithCode = `${countryCode}${formData.phone}`
     const token = localStorage.getItem("token")
     if (!token) {
@@ -600,33 +929,55 @@ function UserForm() {
           )}
 
           <div className="input-group">
-            <label>{t.birthPlace}</label>
-            <select
-              className={errors.birth_place ? "input-invalid" : ""}
-              name="birth_place"
-              value={formData.birth_place}
-              onChange={handleFormChange}
-            >
-              <option value="">Select your city</option>
-              {CITY_OPTIONS.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </select>
-            {formData.birth_place === "Other" && (
-              <input
-                className={errors.birth_place ? "input-invalid" : ""}
-                name="custom_city"
-                placeholder="Enter your city"
-                value={customCity}
-                onChange={(e) => {
-                  setCustomCity(e.target.value)
-                  setErrors((curr) => ({ ...curr, birth_place: "" }))
-                }}
-              />
-            )}
-            {errors.birth_place && <p className="field-error">{errors.birth_place}</p>}
+            <label>{t.birthCountry || "Birth Country"}</label>
+            <SearchSelect
+              inputName="birth_country"
+              value={birthCountry}
+              options={countryOptions}
+              onChange={handleBirthCountryChange}
+              placeholder={t.selectCountry || "Select country"}
+              disabled={locationLoading.countries}
+              loading={locationLoading.countries}
+              error={errors.birth_country}
+              allowCustom={false}
+              maxResults={300}
+            />
+            {errors.birth_country && <p className="field-error">{errors.birth_country}</p>}
+          </div>
+
+          <div className="input-group">
+            <label>{t.birthDistrict || "Birth District/State"}</label>
+            <SearchSelect
+              inputName="birth_district"
+              value={birthDistrict}
+              options={districtOptions}
+              onChange={handleBirthDistrictChange}
+              placeholder={t.selectDistrict || "Select or type district/state"}
+              disabled={!birthCountry || locationLoading.districts}
+              loading={locationLoading.districts}
+              error={errors.birth_district}
+              allowCustom
+              maxResults={200}
+            />
+            {errors.birth_district && <p className="field-error">{errors.birth_district}</p>}
+          </div>
+
+          <div className="input-group">
+            <label>{t.birthCity || "Birth City"}</label>
+            <SearchSelect
+              inputName="birth_city"
+              value={birthCity}
+              options={cityOptions}
+              onChange={handleBirthCityChange}
+              placeholder={t.selectCity || "Select or type city"}
+              disabled={!birthCountry || !birthDistrict || locationLoading.cities}
+              loading={locationLoading.cities}
+              error={errors.birth_city}
+              allowCustom
+              maxResults={200}
+            />
+            {errors.birth_city && <p className="field-error">{errors.birth_city}</p>}
+            {locationError && <p className="field-error">{locationError}</p>}
           </div>
 
           <div className="input-group">
