@@ -5,20 +5,69 @@ import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
 
-const parseBirthPlace = (rawValue) => {
-  const raw = String(rawValue || "").trim()
-  if (!raw) return { city: "", district: "", country: "" }
-  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean)
-  if (parts.length >= 3) {
-    const country = parts[parts.length - 1]
-    const district = parts[parts.length - 2]
-    const city = parts.slice(0, -2).join(", ")
-    return { city, district, country }
-  }
-  if (parts.length === 2) {
-    return { city: parts[0], district: "", country: parts[1] }
-  }
-  return { city: parts[0], district: "", country: "" }
+const splitCommaParts = (rawValue) =>
+  String(rawValue || "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+
+const deriveBirthCountry = (birthPlaceRaw, fallback = "India") => {
+  const parts = splitCommaParts(birthPlaceRaw)
+  if (parts.length < 2) return fallback
+  return parts[parts.length - 1] || fallback
+}
+
+const NOMINATIM_API_BASE =
+  import.meta.env.VITE_NOMINATIM_API_BASE || "https://nominatim.openstreetmap.org"
+
+const buildNominatimUrl = (path) => {
+  const base = String(NOMINATIM_API_BASE).replace(/\/+$/, "")
+  const cleanedPath = String(path || "").replace(/^\/+/, "")
+  return `${base}/${cleanedPath}`
+}
+
+const normalizePlacePart = (value) => String(value || "").trim()
+
+const formatPlaceLabel = ({ address, display_name }) => {
+  const safeAddress = address || {}
+  const city =
+    safeAddress.city ||
+    safeAddress.town ||
+    safeAddress.village ||
+    safeAddress.hamlet ||
+    safeAddress.municipality ||
+    safeAddress.suburb ||
+    ""
+
+  const district =
+    safeAddress.county ||
+    safeAddress.state_district ||
+    safeAddress.district ||
+    safeAddress.region ||
+    ""
+
+  const state = safeAddress.state || safeAddress.province || safeAddress.region || ""
+  const country = safeAddress.country || ""
+
+  const candidateParts = [
+    normalizePlacePart(city),
+    normalizePlacePart(district),
+    normalizePlacePart(state),
+    normalizePlacePart(country),
+  ].filter(Boolean)
+
+  // Avoid obvious duplicates (e.g. district === state).
+  const seen = new Set()
+  const uniqueParts = []
+  candidateParts.forEach((part) => {
+    const key = part.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    uniqueParts.push(part)
+  })
+
+  if (uniqueParts.length > 0) return uniqueParts.join(", ")
+  return normalizePlacePart(display_name)
 }
 
 function SearchSelect({
@@ -219,17 +268,16 @@ function UserForm() {
   })
 
   const [birthCountry, setBirthCountry] = useState("India")
-  const [birthDistrict, setBirthDistrict] = useState("")
-  const [birthCity, setBirthCity] = useState("")
+  const [birthPlace, setBirthPlace] = useState("")
   const [countryOptions, setCountryOptions] = useState([])
-  const [districtOptions, setDistrictOptions] = useState([])
-  const [cityOptions, setCityOptions] = useState([])
-  const [locationLoading, setLocationLoading] = useState({ countries: false, districts: false, cities: false })
+  const [birthPlaceOptions, setBirthPlaceOptions] = useState([])
+  const [locationLoading, setLocationLoading] = useState({ countries: false, birth_place: false })
   const [locationError, setLocationError] = useState("")
+  const [birthPlaceError, setBirthPlaceError] = useState("")
   const locationCacheRef = useRef({
     countries: null,
-    districtsByCountry: {},
-    citiesByCountryDistrict: {},
+    countryIso2ByName: {},
+    birthPlaceByCountryQuery: {},
   })
   const [careerData, setCareerData] = useState({
     education: "",
@@ -321,12 +369,19 @@ function UserForm() {
       try {
         const response = await fetch(buildLocationUrl("/countries/positions"))
         const data = await response.json()
+        const iso2Map = {}
         const list = (data?.data || [])
-          .map((row) => row?.name)
+          .map((row) => {
+            const name = row?.name
+            const iso2 = row?.iso2 || row?.ISO2 || row?.country_code || row?.countryCode
+            if (name && iso2) iso2Map[name] = String(iso2).toLowerCase()
+            return name
+          })
           .filter(Boolean)
           .sort((a, b) => a.localeCompare(b))
         if (cancelled) return
         locationCacheRef.current.countries = list
+        locationCacheRef.current.countryIso2ByName = iso2Map
         setCountryOptions(list)
       } catch (error) {
         console.error("Failed to load countries", error)
@@ -343,116 +398,92 @@ function UserForm() {
 
   useEffect(() => {
     let cancelled = false
-    const loadDistricts = async () => {
+    const controller = new AbortController()
+    const timeout = setTimeout(async () => {
       const country = birthCountry.trim()
-      if (!country) {
-        setDistrictOptions([])
+      const query = birthPlace.trim()
+      if (!country || query.length < 2) {
+        setBirthPlaceOptions([])
+        setBirthPlaceError("")
+        setLocationLoading((curr) => ({ ...curr, birth_place: false }))
         return
       }
-      if (locationCacheRef.current.districtsByCountry[country]) {
-        setDistrictOptions(locationCacheRef.current.districtsByCountry[country])
+      const cacheKey = `${country}::${query.toLowerCase()}`
+      if (locationCacheRef.current.birthPlaceByCountryQuery[cacheKey]) {
+        setBirthPlaceOptions(locationCacheRef.current.birthPlaceByCountryQuery[cacheKey])
+        setLocationLoading((curr) => ({ ...curr, birth_place: false }))
         return
       }
-      setLocationLoading((curr) => ({ ...curr, districts: true }))
-      setLocationError("")
+
+      setLocationLoading((curr) => ({ ...curr, birth_place: true }))
+      setBirthPlaceError("")
       try {
-        const response = await fetch(buildLocationUrl("/countries/states"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ country }),
+        const iso2 = locationCacheRef.current.countryIso2ByName[country]
+        const q = iso2 ? query : `${query}, ${country}`
+        const params = new URLSearchParams({
+          format: "jsonv2",
+          addressdetails: "1",
+          limit: "10",
+          q,
+        })
+        if (iso2) params.set("countrycodes", iso2)
+        const response = await fetch(`${buildNominatimUrl("/search")}?${params.toString()}`, {
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
         })
         const data = await response.json()
-        const list = (data?.data?.states || [])
-          .map((row) => row?.name)
+        const seen = new Set()
+        const list = (Array.isArray(data) ? data : [])
+          .map((row) => formatPlaceLabel(row))
+          .map((label) => normalizePlacePart(label))
           .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
+          .filter((label) => {
+            const key = label.toLowerCase()
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+
         if (cancelled) return
-        locationCacheRef.current.districtsByCountry[country] = list
-        setDistrictOptions(list)
+        locationCacheRef.current.birthPlaceByCountryQuery[cacheKey] = list
+        setBirthPlaceOptions(list)
       } catch (error) {
-        console.error("Failed to load districts", error)
-        if (!cancelled) setLocationError("Could not load districts/states list. Please type it manually.")
+        if (error?.name === "AbortError") return
+        console.error("Failed to search places", error)
+        if (!cancelled) setBirthPlaceError("Could not search cities. Please type your city manually.")
       } finally {
-        if (!cancelled) setLocationLoading((curr) => ({ ...curr, districts: false }))
+        if (!cancelled) setLocationLoading((curr) => ({ ...curr, birth_place: false }))
       }
-    }
-    loadDistricts()
+    }, 250)
+
     return () => {
       cancelled = true
+      clearTimeout(timeout)
+      controller.abort()
     }
-  }, [birthCountry])
+  }, [birthCountry, birthPlace])
 
   useEffect(() => {
-    let cancelled = false
-    const loadCities = async () => {
-      const country = birthCountry.trim()
-      const district = birthDistrict.trim()
-      if (!country || !district) {
-        setCityOptions([])
-        return
-      }
-      if (districtOptions.length > 0 && !districtOptions.includes(district)) {
-        // Avoid calling API for partial/non-matching district while typing.
-        setCityOptions([])
-        return
-      }
-      const cacheKey = `${country}::${district}`
-      if (locationCacheRef.current.citiesByCountryDistrict[cacheKey]) {
-        setCityOptions(locationCacheRef.current.citiesByCountryDistrict[cacheKey])
-        return
-      }
-      setLocationLoading((curr) => ({ ...curr, cities: true }))
-      setLocationError("")
-      try {
-        const response = await fetch(buildLocationUrl("/countries/state/cities"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ country, state: district }),
-        })
-        const data = await response.json()
-        const list = (data?.data || [])
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-        if (cancelled) return
-        locationCacheRef.current.citiesByCountryDistrict[cacheKey] = list
-        setCityOptions(list)
-      } catch (error) {
-        console.error("Failed to load cities", error)
-        if (!cancelled) setLocationError("Could not load cities list. Please type your city manually.")
-      } finally {
-        if (!cancelled) setLocationLoading((curr) => ({ ...curr, cities: false }))
-      }
+    const rawPlace = birthPlace.trim()
+    const rawCountry = birthCountry.trim()
+    let composed = rawPlace
+    if (rawPlace && rawCountry && !rawPlace.toLowerCase().includes(rawCountry.toLowerCase())) {
+      composed = `${rawPlace}, ${rawCountry}`
     }
-    loadCities()
-    return () => {
-      cancelled = true
-    }
-  }, [birthCountry, birthDistrict, districtOptions])
-
-  useEffect(() => {
-    const composed = [birthCity.trim(), birthDistrict.trim(), birthCountry.trim()].filter(Boolean).join(", ")
     setFormData((current) => (current.birth_place === composed ? current : { ...current, birth_place: composed }))
-  }, [birthCity, birthDistrict, birthCountry])
+  }, [birthPlace, birthCountry])
 
   const handleBirthCountryChange = (nextCountry) => {
     setBirthCountry(nextCountry)
-    setBirthDistrict("")
-    setBirthCity("")
-    setDistrictOptions([])
-    setCityOptions([])
-    setErrors((current) => ({ ...current, birth_country: "", birth_district: "", birth_city: "" }))
+    setBirthPlace("")
+    setBirthPlaceOptions([])
+    setBirthPlaceError("")
+    setErrors((current) => ({ ...current, birth_country: "", birth_place: "" }))
   }
 
-  const handleBirthDistrictChange = (nextDistrict) => {
-    setBirthDistrict(nextDistrict)
-    setBirthCity("")
-    setCityOptions([])
-    setErrors((current) => ({ ...current, birth_district: "", birth_city: "" }))
-  }
-
-  const handleBirthCityChange = (nextCity) => {
-    setBirthCity(nextCity)
-    setErrors((current) => ({ ...current, birth_city: "" }))
+  const handleBirthPlaceChange = (nextPlace) => {
+    setBirthPlace(nextPlace)
+    setErrors((current) => ({ ...current, birth_place: "" }))
   }
 
   useEffect(() => {
@@ -514,10 +545,9 @@ function UserForm() {
           birth_time_accuracy: profile.birth_time_accuracy || "unknown",
         })
         setTimeParts(deriveTimeParts(profile.birth_time))
-        const parsedBirthPlace = parseBirthPlace(profile.birth_place || "")
-        setBirthCountry(parsedBirthPlace.country || "India")
-        setBirthDistrict(parsedBirthPlace.district || "")
-        setBirthCity(parsedBirthPlace.city || "")
+        const rawBirthPlace = profile.birth_place || ""
+        setBirthCountry(deriveBirthCountry(rawBirthPlace, "India"))
+        setBirthPlace(rawBirthPlace)
         setCareerData({
           education: profile.education || "",
           interests: profile.interests || "",
@@ -563,8 +593,7 @@ function UserForm() {
       nextErrors.birth_time = "Enter a valid time (HH:MM)"
     }
     if (!birthCountry.trim()) nextErrors.birth_country = "Country is required."
-    if (!birthDistrict.trim()) nextErrors.birth_district = "District/State is required."
-    if (!birthCity.trim()) nextErrors.birth_city = "City is required."
+    if (!birthPlace.trim()) nextErrors.birth_place = "City is required."
     const addressCheck = validateAddress(formData.address || "")
     if (!addressCheck.isValid) nextErrors.address = addressCheck.message
     setErrors(nextErrors)
@@ -615,14 +644,11 @@ function UserForm() {
       handleBirthCountryChange(value)
       return
     }
-    if (name === "birth_district") {
-      handleBirthDistrictChange(value)
+    if (name === "birth_place") {
+      handleBirthPlaceChange(value)
       return
     }
-    if (name === "birth_city") {
-      handleBirthCityChange(value)
-      return
-    } else if (name === "phone") {
+    if (name === "phone") {
       // keep only digits for local part
       const digitsOnly = value.replace(/\D/g, "").slice(0, 10)
       setFormData((current) => ({ ...current, [name]: digitsOnly }))
@@ -928,56 +954,42 @@ function UserForm() {
             </div>
           )}
 
-          <div className="input-group">
-            <label>{t.birthCountry || "Birth Country"}</label>
-            <SearchSelect
-              inputName="birth_country"
-              value={birthCountry}
-              options={countryOptions}
-              onChange={handleBirthCountryChange}
-              placeholder={t.selectCountry || "Select country"}
-              disabled={locationLoading.countries}
-              loading={locationLoading.countries}
-              error={errors.birth_country}
-              allowCustom={false}
-              maxResults={300}
-            />
-            {errors.birth_country && <p className="field-error">{errors.birth_country}</p>}
-          </div>
+          <div className="birthplace-row">
+            <div className="input-group">
+              <label>{t.birthCountry || "Birth Country"}</label>
+              <SearchSelect
+                inputName="birth_country"
+                value={birthCountry}
+                options={countryOptions}
+                onChange={handleBirthCountryChange}
+                placeholder={t.selectCountry || "Select country"}
+                disabled={locationLoading.countries}
+                loading={locationLoading.countries}
+                error={errors.birth_country}
+                allowCustom={false}
+                maxResults={300}
+              />
+              {errors.birth_country && <p className="field-error">{errors.birth_country}</p>}
+              {locationError && <p className="field-error">{locationError}</p>}
+            </div>
 
-          <div className="input-group">
-            <label>{t.birthDistrict || "Birth District/State"}</label>
-            <SearchSelect
-              inputName="birth_district"
-              value={birthDistrict}
-              options={districtOptions}
-              onChange={handleBirthDistrictChange}
-              placeholder={t.selectDistrict || "Select or type district/state"}
-              disabled={!birthCountry || locationLoading.districts}
-              loading={locationLoading.districts}
-              error={errors.birth_district}
-              allowCustom
-              maxResults={200}
-            />
-            {errors.birth_district && <p className="field-error">{errors.birth_district}</p>}
-          </div>
-
-          <div className="input-group">
-            <label>{t.birthCity || "Birth City"}</label>
-            <SearchSelect
-              inputName="birth_city"
-              value={birthCity}
-              options={cityOptions}
-              onChange={handleBirthCityChange}
-              placeholder={t.selectCity || "Select or type city"}
-              disabled={!birthCountry || !birthDistrict || locationLoading.cities}
-              loading={locationLoading.cities}
-              error={errors.birth_city}
-              allowCustom
-              maxResults={200}
-            />
-            {errors.birth_city && <p className="field-error">{errors.birth_city}</p>}
-            {locationError && <p className="field-error">{locationError}</p>}
+            <div className="input-group">
+              <label>{t.birthCity || "Birth City"}</label>
+              <SearchSelect
+                inputName="birth_place"
+                value={birthPlace}
+                options={birthPlaceOptions}
+                onChange={handleBirthPlaceChange}
+                placeholder={t.selectCity || "Search city (city, district, state)"}
+                disabled={!birthCountry}
+                loading={locationLoading.birth_place}
+                error={errors.birth_place}
+                allowCustom
+                maxResults={60}
+              />
+              {errors.birth_place && <p className="field-error">{errors.birth_place}</p>}
+              {birthPlaceError && <p className="field-error">{birthPlaceError}</p>}
+            </div>
           </div>
 
           <div className="input-group">

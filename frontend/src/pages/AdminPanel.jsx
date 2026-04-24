@@ -168,6 +168,18 @@ function AdminPanel() {
     priority: "",
     customer_message: "",
   })
+  const [bulkRuleFiles, setBulkRuleFiles] = useState([])
+  const [bulkRuleLoading, setBulkRuleLoading] = useState(false)
+  const [bulkRuleProgress, setBulkRuleProgress] = useState({ total: 0, done: 0, ok: 0, failed: 0 })
+  const [bulkRuleError, setBulkRuleError] = useState("")
+  const [bulkRuleSyncDelete, setBulkRuleSyncDelete] = useState(false)
+  const bulkRuleFileInputId = "bulk-rule-files-input"
+  const bulkRuleFilesLabel = useMemo(() => {
+    if (!bulkRuleFiles.length) return "No file chosen"
+    const names = bulkRuleFiles.map((f) => f.name).filter(Boolean)
+    if (names.length <= 2) return names.join(", ")
+    return `${names.slice(0, 2).join(", ")} +${names.length - 2} more`
+  }, [bulkRuleFiles])
 
   const activeSectionNames = sectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
   const activeSubsectionNames = subsectionOptions.filter((s) => s.is_active !== false).map((s) => s.name)
@@ -340,6 +352,537 @@ function AdminPanel() {
       customer_message: "",
     })
     setEditingRuleId(null)
+  }
+
+  const readFileAsText = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result || ""))
+      reader.onerror = () => reject(reader.error || new Error("Failed to read file"))
+      reader.readAsText(file)
+    })
+
+  const readFileAsArrayBuffer = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = () => reject(reader.error || new Error("Failed to read file"))
+      reader.readAsArrayBuffer(file)
+    })
+
+  const normalizeHeaderKey = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, "")
+
+  const RULE_COLUMN_MAP = {
+    id: "id",
+    ruleid: "id",
+    masterruleid: "id",
+    rulename: "rule_name",
+    name: "rule_name",
+    ruletype: "rule_type",
+    type: "rule_type",
+    insight: "insight",
+    why: "why",
+    section: "section",
+    nextmove: "next_move",
+    alternative: "alternative",
+    risk: "risk",
+    mistake: "mistake",
+    priority: "priority",
+    customermessage: "customer_message",
+
+    actionenergylow: "action_energy_low",
+    actionenergymin: "action_energy_low",
+    actionenergyfrom: "action_energy_low",
+    actionenergyhigh: "action_energy_high",
+    actionenergymax: "action_energy_high",
+    actionenergyto: "action_energy_high",
+
+    clarityenergylow: "clarity_energy_low",
+    clarityenergymin: "clarity_energy_low",
+    clarityenergyhigh: "clarity_energy_high",
+    clarityenergymax: "clarity_energy_high",
+
+    emotionalenergylow: "emotional_energy_low",
+    emotionalenergymin: "emotional_energy_low",
+    emotionalenergyhigh: "emotional_energy_high",
+    emotionalenergymax: "emotional_energy_high",
+
+    opportunityenergylow: "opportunity_energy_low",
+    opportunityenergymin: "opportunity_energy_low",
+    opportunityenergyhigh: "opportunity_energy_high",
+    opportunityenergymax: "opportunity_energy_high",
+
+    fireelementlow: "fire_element_low",
+    fireelementmin: "fire_element_low",
+    fireelementhigh: "fire_element_high",
+    fireelementmax: "fire_element_high",
+
+    earthelementlow: "earth_element_low",
+    earthelementmin: "earth_element_low",
+    earthelementhigh: "earth_element_high",
+    earthelementmax: "earth_element_high",
+
+    airelementlow: "air_element_low",
+    airelementmin: "air_element_low",
+    airelementhigh: "air_element_high",
+    airelementmax: "air_element_high",
+
+    waterelementlow: "water_element_low",
+    waterelementmin: "water_element_low",
+    waterelementhigh: "water_element_high",
+    waterelementmax: "water_element_high",
+
+    spaceelementlow: "space_element_low",
+    spaceelementmin: "space_element_low",
+    spaceelementhigh: "space_element_high",
+    spaceelementmax: "space_element_high",
+  }
+
+  const remapRowKeys = (row) => {
+    const out = {}
+    Object.keys(row || {}).forEach((key) => {
+      const normalized = normalizeHeaderKey(key)
+      const mapped = RULE_COLUMN_MAP[normalized] || key
+      out[mapped] = row[key]
+    })
+    return out
+  }
+
+  const getRuleIdFromRow = (row) => {
+    const raw = row?.id
+    if (raw === null || raw === undefined || String(raw).trim() === "") return null
+    const num = Number(String(raw).trim())
+    return Number.isFinite(num) ? num : null
+  }
+
+  const parseCsv = (text) => {
+    const rows = []
+    let row = []
+    let cell = ""
+    let inQuotes = false
+
+    const pushCell = () => {
+      row.push(cell)
+      cell = ""
+    }
+    const pushRow = () => {
+      // skip completely empty trailing rows
+      if (row.length === 1 && row[0] === "") {
+        row = []
+        return
+      }
+      rows.push(row)
+      row = []
+    }
+
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text[i]
+      if (inQuotes) {
+        if (ch === "\"") {
+          const next = text[i + 1]
+          if (next === "\"") {
+            cell += "\""
+            i += 1
+          } else {
+            inQuotes = false
+          }
+        } else {
+          cell += ch
+        }
+        continue
+      }
+      if (ch === "\"") {
+        inQuotes = true
+        continue
+      }
+      if (ch === ",") {
+        pushCell()
+        continue
+      }
+      if (ch === "\n") {
+        pushCell()
+        pushRow()
+        continue
+      }
+      if (ch === "\r") {
+        continue
+      }
+      cell += ch
+    }
+    pushCell()
+    if (row.length) pushRow()
+    return rows
+  }
+
+  const csvToObjects = (text) => {
+    const matrix = parseCsv(String(text || ""))
+    if (!matrix.length) return []
+    const headers = matrix[0].map((h) => String(h || "").trim())
+    const objects = []
+    for (let i = 1; i < matrix.length; i += 1) {
+      const values = matrix[i]
+      const obj = {}
+      let anyValue = false
+      for (let c = 0; c < headers.length; c += 1) {
+        const key = headers[c]
+        if (!key) continue
+        const value = values?.[c] ?? ""
+        const trimmed = String(value ?? "").trim()
+        if (trimmed !== "") anyValue = true
+        obj[key] = trimmed
+      }
+      if (anyValue) objects.push(remapRowKeys(obj))
+    }
+    return objects
+  }
+
+  const u16 = (view, offset) => view.getUint16(offset, true)
+  const u32 = (view, offset) => view.getUint32(offset, true)
+
+  const findZipEndOfCentralDir = (view) => {
+    // EOCD signature 0x06054b50
+    for (let i = view.byteLength - 22; i >= 0 && i >= view.byteLength - 66000; i -= 1) {
+      if (u32(view, i) === 0x06054b50) return i
+    }
+    return -1
+  }
+
+  const extractZipEntries = async (arrayBuffer) => {
+    const view = new DataView(arrayBuffer)
+    const eocdOffset = findZipEndOfCentralDir(view)
+    if (eocdOffset < 0) throw new Error("Invalid .xlsx (zip) file")
+
+    const centralDirSize = u32(view, eocdOffset + 12)
+    const centralDirOffset = u32(view, eocdOffset + 16)
+    const end = centralDirOffset + centralDirSize
+
+    const entries = new Map()
+    let ptr = centralDirOffset
+    while (ptr < end) {
+      if (u32(view, ptr) !== 0x02014b50) break
+      const compMethod = u16(view, ptr + 10)
+      const compressedSize = u32(view, ptr + 20)
+      const uncompressedSize = u32(view, ptr + 24)
+      const nameLen = u16(view, ptr + 28)
+      const extraLen = u16(view, ptr + 30)
+      const commentLen = u16(view, ptr + 32)
+      const localHeaderOffset = u32(view, ptr + 42)
+      const nameBytes = new Uint8Array(arrayBuffer, ptr + 46, nameLen)
+      const name = new TextDecoder().decode(nameBytes)
+      entries.set(name, { compMethod, compressedSize, uncompressedSize, localHeaderOffset })
+      ptr += 46 + nameLen + extraLen + commentLen
+    }
+
+    const readEntry = async (name) => {
+      const meta = entries.get(name)
+      if (!meta) return null
+      const lh = meta.localHeaderOffset
+      if (u32(view, lh) !== 0x04034b50) throw new Error("Invalid zip local header")
+      const nameLen = u16(view, lh + 26)
+      const extraLen = u16(view, lh + 28)
+      const dataStart = lh + 30 + nameLen + extraLen
+      const compressed = new Uint8Array(arrayBuffer, dataStart, meta.compressedSize)
+
+      if (meta.compMethod === 0) {
+        return new Uint8Array(compressed)
+      }
+      if (meta.compMethod !== 8) throw new Error("Unsupported .xlsx compression")
+
+      if (typeof DecompressionStream === "undefined") {
+        throw new Error("Excel (.xlsx) not supported on this browser. Please export as CSV.")
+      }
+      const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"))
+      const decompressed = await new Response(stream).arrayBuffer()
+      return new Uint8Array(decompressed)
+    }
+
+    return { readEntry }
+  }
+
+  const textFromBytes = (bytes) => new TextDecoder("utf-8").decode(bytes || new Uint8Array())
+
+  const parseSharedStrings = (xmlText) => {
+    if (!xmlText) return []
+    const doc = new DOMParser().parseFromString(xmlText, "application/xml")
+    const sis = Array.from(doc.getElementsByTagName("si"))
+    return sis.map((si) => {
+      const texts = Array.from(si.getElementsByTagName("t")).map((t) => t.textContent || "")
+      return texts.join("")
+    })
+  }
+
+  const colLettersToIndex = (letters) => {
+    let index = 0
+    const s = String(letters || "").toUpperCase()
+    for (let i = 0; i < s.length; i += 1) {
+      const code = s.charCodeAt(i)
+      if (code < 65 || code > 90) continue
+      index = index * 26 + (code - 64)
+    }
+    return Math.max(0, index - 1)
+  }
+
+  const parseSheetToMatrix = (xmlText, sharedStrings) => {
+    if (!xmlText) return []
+    const doc = new DOMParser().parseFromString(xmlText, "application/xml")
+    const rows = Array.from(doc.getElementsByTagName("row"))
+    const matrix = []
+    rows.forEach((rowNode) => {
+      const row = []
+      const cells = Array.from(rowNode.getElementsByTagName("c"))
+      cells.forEach((cellNode) => {
+        const ref = cellNode.getAttribute("r") || ""
+        const colLetters = ref.replace(/[0-9]/g, "")
+        const colIndex = colLettersToIndex(colLetters)
+        const type = cellNode.getAttribute("t") || ""
+        let value = ""
+        if (type === "inlineStr") {
+          const t = cellNode.getElementsByTagName("t")[0]
+          value = t?.textContent || ""
+        } else {
+          const v = cellNode.getElementsByTagName("v")[0]
+          const raw = v?.textContent || ""
+          if (type === "s") {
+            const idx = Number(raw)
+            value = Number.isFinite(idx) ? (sharedStrings[idx] || "") : ""
+          } else {
+            value = raw
+          }
+        }
+        row[colIndex] = value
+      })
+      // Trim end empties
+      while (row.length && (row[row.length - 1] === "" || row[row.length - 1] === undefined)) row.pop()
+      matrix.push(row.map((v) => (v === undefined ? "" : String(v))))
+    })
+    return matrix
+  }
+
+  const xlsxToObjects = async (arrayBuffer) => {
+    const zip = await extractZipEntries(arrayBuffer)
+    const sharedBytes = await zip.readEntry("xl/sharedStrings.xml")
+    const sheetBytes =
+      (await zip.readEntry("xl/worksheets/sheet1.xml")) ||
+      (await zip.readEntry("xl/worksheets/sheet0.xml"))
+    if (!sheetBytes) throw new Error("Could not find sheet1 in .xlsx")
+
+    const sharedStrings = parseSharedStrings(sharedBytes ? textFromBytes(sharedBytes) : "")
+    const matrix = parseSheetToMatrix(textFromBytes(sheetBytes), sharedStrings)
+    if (!matrix.length) return []
+    const headers = matrix[0].map((h) => String(h || "").trim())
+    const objects = []
+    for (let i = 1; i < matrix.length; i += 1) {
+      const values = matrix[i]
+      const obj = {}
+      let anyValue = false
+      for (let c = 0; c < headers.length; c += 1) {
+        const key = headers[c]
+        if (!key) continue
+        const raw = values?.[c] ?? ""
+        const trimmed = String(raw ?? "").trim()
+        if (trimmed !== "") anyValue = true
+        obj[key] = trimmed
+      }
+      if (anyValue) objects.push(remapRowKeys(obj))
+    }
+    return objects
+  }
+
+  const normalizeRulePayload = (rawRule) => {
+    const payload = { ...(rawRule || {}) }
+    delete payload.id
+    delete payload.rule_id
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === "") payload[key] = null
+      if (typeof payload[key] === "string" && payload[key] !== null && /^\d+$/.test(payload[key])) {
+        payload[key] = Number(payload[key])
+      }
+    })
+    return payload
+  }
+
+  const validateRulePayload = (payload) => {
+    const errors = []
+    const checkText = (label, value, min, max, required = true) => {
+      const val = value ?? ""
+      if (!String(val).trim()) {
+        if (required) errors.push(`${label} is required`)
+        return
+      }
+      const trimmed = String(val).trim()
+      if (trimmed.length < min) errors.push(`${label} must be at least ${min} chars`)
+      if (trimmed.length > max) errors.push(`${label} must be at most ${max} chars`)
+    }
+    const checkOptionalText = (label, value, min, max) => {
+      const val = value ?? ""
+      if (!String(val).trim()) return
+      const trimmed = String(val).trim()
+      if (trimmed.length < min) errors.push(`${label} must be at least ${min} chars`)
+      if (trimmed.length > max) errors.push(`${label} must be at most ${max} chars`)
+    }
+    const checkNumber = (label, value) => {
+      if (value === "" || value === null || value === undefined) {
+        errors.push(`${label} is required`)
+        return
+      }
+      const num = Number(value)
+      if (Number.isNaN(num) || num < 0 || num > 500) errors.push(`${label} must be between 0 and 500`)
+    }
+    const checkRangePair = (label, low, high) => {
+      const hasLow = low !== "" && low !== null && low !== undefined
+      const hasHigh = high !== "" && high !== null && high !== undefined
+      if (!hasLow || !hasHigh) {
+        errors.push(`${label} min and max are required`)
+        return
+      }
+      const lowNum = Number(low)
+      const highNum = Number(high)
+      if (Number.isNaN(lowNum) || lowNum < 0 || lowNum > 500) errors.push(`${label} min must be 0-500`)
+      if (Number.isNaN(highNum) || highNum < 0 || highNum > 500) errors.push(`${label} max must be 0-500`)
+      if (!Number.isNaN(lowNum) && !Number.isNaN(highNum) && lowNum > highNum) errors.push(`${label} min cannot exceed max`)
+    }
+
+    checkText("Rule Name", payload.rule_name, 3, 100)
+    checkText("Type", payload.rule_type, 2, 50)
+    checkText("Insight", payload.insight, 2, 500)
+    checkText("Why", payload.why, 2, 500)
+    checkNumber("Section", payload.section)
+    checkText("Next move", payload.next_move, 5, 500)
+    checkOptionalText("Alternative", payload.alternative, 5, 500)
+    checkOptionalText("Risk", payload.risk, 5, 500)
+    checkOptionalText("Mistake", payload.mistake, 5, 500)
+    checkText("Priority", payload.priority, 3, 100)
+    checkOptionalText("Customer message", payload.customer_message, 5, 500)
+
+    checkRangePair("Action Energy", payload.action_energy_low, payload.action_energy_high)
+    checkRangePair("Clarity Energy", payload.clarity_energy_low, payload.clarity_energy_high)
+    checkRangePair("Emotional Energy", payload.emotional_energy_low, payload.emotional_energy_high)
+    checkRangePair("Opportunity Energy", payload.opportunity_energy_low, payload.opportunity_energy_high)
+    checkRangePair("Fire", payload.fire_element_low, payload.fire_element_high)
+    checkRangePair("Earth", payload.earth_element_low, payload.earth_element_high)
+    checkRangePair("Air", payload.air_element_low, payload.air_element_high)
+    checkRangePair("Water", payload.water_element_low, payload.water_element_high)
+    checkRangePair("Space", payload.space_element_low, payload.space_element_high)
+
+    return errors
+  }
+
+  const parseRulesFromFile = async (file) => {
+    const name = String(file?.name || "").toLowerCase()
+    if (name.endsWith(".json")) {
+      const text = await readFileAsText(file)
+      const parsed = JSON.parse(text)
+      const rules = Array.isArray(parsed) ? parsed : [parsed]
+      return rules.map((r) => remapRowKeys(r))
+    }
+    if (name.endsWith(".csv")) {
+      const text = await readFileAsText(file)
+      return csvToObjects(text)
+    }
+    if (name.endsWith(".xlsx")) {
+      const buf = await readFileAsArrayBuffer(file)
+      return await xlsxToObjects(buf)
+    }
+    throw new Error(`Unsupported file type: ${file?.name || "file"}`)
+  }
+
+  const handleBulkRuleUpload = async () => {
+    if (!bulkRuleFiles.length) return
+    setBulkRuleLoading(true)
+    setBulkRuleError("")
+    setBulkRuleProgress({ total: 0, done: 0, ok: 0, failed: 0 })
+
+    const adminToken = getAdminToken()
+    let ok = 0
+    let failed = 0
+    const allRules = []
+
+    try {
+      // Always fetch current rules so upserts/deletes are accurate.
+      const existingResp = await api.get("/admin/rules", { headers: { Authorization: `Bearer ${adminToken}` } })
+      const existingRules = existingResp.data?.rules || []
+      const existingIds = new Set(existingRules.map((r) => r?.id).filter((v) => Number.isFinite(v)))
+
+      for (const file of bulkRuleFiles) {
+        const rules = await parseRulesFromFile(file)
+        rules.forEach((rule) => allRules.push({ fileName: file.name, rule }))
+      }
+
+      const fileIds = new Set(allRules.map((item) => getRuleIdFromRow(item.rule)).filter((v) => v !== null))
+      if (bulkRuleSyncDelete) {
+        const missingIdCount = allRules.filter((item) => getRuleIdFromRow(item.rule) === null).length
+        if (missingIdCount > 0) {
+          throw new Error(`Sync delete requires 'id' column for every row. Missing id in ${missingIdCount} row(s).`)
+        }
+      }
+
+      const deleteCount = bulkRuleSyncDelete ? Array.from(existingIds).filter((id) => !fileIds.has(id)).length : 0
+      setBulkRuleProgress((curr) => ({ ...curr, total: allRules.length + deleteCount }))
+
+      for (let i = 0; i < allRules.length; i += 1) {
+        const { fileName, rule } = allRules[i]
+        const ruleId = getRuleIdFromRow(rule)
+        const payload = normalizeRulePayload(rule)
+        const validationErrors = validateRulePayload(payload)
+        if (validationErrors.length) {
+          failed += 1
+          setBulkRuleProgress((curr) => ({ ...curr, done: i + 1, ok, failed }))
+          // show first error but keep going
+          setBulkRuleError(`${fileName}: ${validationErrors[0]}`)
+          continue
+        }
+        try {
+          if (ruleId !== null && existingIds.has(ruleId)) {
+            const resp = await api.put(`/admin/rules/${ruleId}`, payload, { headers: { Authorization: `Bearer ${adminToken}` } })
+            ok += 1
+            if (resp?.data?.rule) {
+              setRuleList((prev) => prev.map((r) => (r.id === ruleId ? resp.data.rule : r)))
+            }
+          } else {
+            const resp = await api.post("/admin/rules", payload, { headers: { Authorization: `Bearer ${adminToken}` } })
+            ok += 1
+            if (resp?.data?.rule) {
+              setRuleList((prev) => [...prev, resp.data.rule])
+            }
+          }
+        } catch (err) {
+          failed += 1
+          setBulkRuleError(`${fileName}: ${getErrorMessage(err)}`)
+        } finally {
+          setBulkRuleProgress((curr) => ({ ...curr, done: i + 1, ok, failed }))
+        }
+      }
+
+      if (bulkRuleSyncDelete) {
+        const idsToDelete = Array.from(existingIds).filter((id) => !fileIds.has(id))
+        for (let j = 0; j < idsToDelete.length; j += 1) {
+          const id = idsToDelete[j]
+          try {
+            await api.delete(`/admin/rules/${id}`, { headers: { Authorization: `Bearer ${adminToken}` } })
+            ok += 1
+            setRuleList((prev) => prev.filter((r) => r.id !== id))
+          } catch (err) {
+            failed += 1
+            setBulkRuleError(`Delete ${id}: ${getErrorMessage(err)}`)
+          } finally {
+            setBulkRuleProgress((curr) => ({ ...curr, done: allRules.length + j + 1, ok, failed }))
+          }
+        }
+      }
+
+      if (ok > 0) showSuccess(`Uploaded ${ok} rule(s).`)
+      if (failed > 0) showError(`Failed ${failed} rule(s).`)
+    } catch (err) {
+      const message = err?.message || "Bulk upload failed."
+      setBulkRuleError(message)
+      showError(message)
+    } finally {
+      setBulkRuleLoading(false)
+    }
   }
 
   const loadRules = async () => {
@@ -1508,6 +2051,83 @@ function AdminPanel() {
         <p className="admin-helper-text">Create & update Rules entries.</p>
       </div>
       {ruleError && <span className="admin-helper-text danger">{ruleError}</span>}
+    </div>
+
+    <div className="admin-log-actions admin-log-actions-split" style={{ alignItems: "flex-end" }}>
+      <div style={{ flex: 1 }}>
+        <p className="admin-helper-text" style={{ margin: 0 }}>
+          Bulk upload (JSON/CSV/Excel): JSON file can contain 1 rule object or an array. CSV/Excel uses first row as headers.
+        </p>
+        {bulkRuleError && <span className="admin-helper-text danger">{bulkRuleError}</span>}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+          <div className="admin-file-picker">
+            <input
+              id={bulkRuleFileInputId}
+              className="admin-file-input"
+              type="file"
+              accept="application/json,.json,text/csv,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
+              multiple
+              disabled={bulkRuleLoading}
+              onChange={(e) => {
+                const files = Array.from(e.target.files || [])
+                setBulkRuleFiles(files)
+                setBulkRuleProgress({ total: 0, done: 0, ok: 0, failed: 0 })
+                setBulkRuleError("")
+              }}
+            />
+            <button
+              type="button"
+              className="admin-action-btn admin-file-picker-btn"
+              disabled={bulkRuleLoading}
+              onClick={() => {
+                const el = document.getElementById(bulkRuleFileInputId)
+                if (el) el.click()
+              }}
+            >
+              Choose Files
+            </button>
+            <div className="admin-file-picker-label" title={bulkRuleFilesLabel}>
+              {bulkRuleFilesLabel}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="admin-action-btn"
+            disabled={bulkRuleLoading || bulkRuleFiles.length === 0}
+            onClick={handleBulkRuleUpload}
+          >
+            {bulkRuleLoading ? "Uploading..." : `Upload ${bulkRuleFiles.length || 0} File(s)`}
+          </button>
+          <button
+            type="button"
+            className="admin-action-btn ghost"
+            disabled={bulkRuleLoading || bulkRuleFiles.length === 0}
+            onClick={() => {
+              setBulkRuleFiles([])
+              setBulkRuleProgress({ total: 0, done: 0, ok: 0, failed: 0 })
+              setBulkRuleError("")
+              const el = document.getElementById(bulkRuleFileInputId)
+              if (el) el.value = ""
+            }}
+          >
+            Clear Files
+          </button>
+        </div>
+        <label className="admin-helper-text" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+          <input
+            type="checkbox"
+            checked={bulkRuleSyncDelete}
+            disabled={bulkRuleLoading}
+            onChange={(e) => setBulkRuleSyncDelete(e.target.checked)}
+          />
+          Sync mode (danger): update existing by `id` and delete DB rules not present in the file(s).
+        </label>
+        {bulkRuleProgress.total > 0 && (
+          <p className="admin-helper-text" style={{ marginTop: 6 }}>
+            Progress: {bulkRuleProgress.done}/{bulkRuleProgress.total} • OK: {bulkRuleProgress.ok} • Failed: {bulkRuleProgress.failed}
+          </p>
+        )}
+      </div>
     </div>
 
     <form className="admin-question-form" onSubmit={handleRuleSubmit}>

@@ -3064,6 +3064,42 @@ align-items:center;
   border-color: rgba(248, 113, 113, 0.22);
 }
 
+.admin-file-picker {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex: 1 1 440px;
+  min-width: 280px;
+}
+
+.admin-file-input {
+  display: none;
+}
+
+.admin-file-picker-btn {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.admin-file-picker-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 14px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(2, 6, 23, 0.28);
+  color: #cbd5e1;
+  font-size: 13px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
 .admin-log-list {
   display: flex;
   flex-direction: column;
@@ -3664,6 +3700,16 @@ align-items:center;
   display: flex;
   gap: 10px;
   align-items: center;
+}
+.birthplace-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+.birthplace-row .input-group {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .country-code {
   width: 110px;
