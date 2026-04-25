@@ -205,30 +205,29 @@ function SearchSelect({
             </div>
           )}
 
-          {!loading &&
-            filtered.map((opt, idx) => {
-              const isActive = idx === activeIndex
-              return (
-                <div
-                  key={`${opt}-${idx}`}
-                  role="option"
-                  aria-selected={isActive}
-                  onMouseEnter={() => setActiveIndex(idx)}
-                  onMouseDown={(e) => {
-                    // Prevent blur before selection
-                    e.preventDefault()
-                    commitValue(opt)
-                  }}
-                  style={{
-                    padding: "10px 12px",
-                    cursor: "pointer",
-                    background: isActive ? "rgba(59,130,246,0.14)" : "transparent",
-                  }}
-                >
-                  {opt}
-                </div>
-              )
-            })}
+          {filtered.map((opt, idx) => {
+            const isActive = idx === activeIndex
+            return (
+              <div
+                key={`${opt}-${idx}`}
+                role="option"
+                aria-selected={isActive}
+                onMouseEnter={() => setActiveIndex(idx)}
+                onMouseDown={(e) => {
+                  // Prevent blur before selection
+                  e.preventDefault()
+                  commitValue(opt)
+                }}
+                style={{
+                  padding: "10px 12px",
+                  cursor: "pointer",
+                  background: isActive ? "rgba(59,130,246,0.14)" : "transparent",
+                }}
+              >
+                {opt}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -278,6 +277,7 @@ function UserForm() {
     countries: null,
     countryIso2ByName: {},
     birthPlaceByCountryQuery: {},
+    citiesByCountry: {},
   })
   const [careerData, setCareerData] = useState({
     education: "",
@@ -399,24 +399,79 @@ function UserForm() {
   useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
-    const timeout = setTimeout(async () => {
-      const country = birthCountry.trim()
-      const query = birthPlace.trim()
-      if (!country || query.length < 2) {
-        setBirthPlaceOptions([])
-        setBirthPlaceError("")
-        setLocationLoading((curr) => ({ ...curr, birth_place: false }))
-        return
-      }
-      const cacheKey = `${country}::${query.toLowerCase()}`
-      if (locationCacheRef.current.birthPlaceByCountryQuery[cacheKey]) {
-        setBirthPlaceOptions(locationCacheRef.current.birthPlaceByCountryQuery[cacheKey])
-        setLocationLoading((curr) => ({ ...curr, birth_place: false }))
-        return
-      }
+    const country = birthCountry.trim()
+    const query = birthPlace.trim()
 
-      setLocationLoading((curr) => ({ ...curr, birth_place: true }))
+    if (!country || query.length < 1) {
+      setBirthPlaceOptions([])
       setBirthPlaceError("")
+      setLocationLoading((curr) => ({ ...curr, birth_place: false }))
+      return () => {
+        cancelled = true
+        controller.abort()
+      }
+    }
+
+    const cacheKey = `${country}::${query.toLowerCase()}`
+    if (locationCacheRef.current.birthPlaceByCountryQuery[cacheKey]) {
+      setBirthPlaceOptions(locationCacheRef.current.birthPlaceByCountryQuery[cacheKey])
+      setBirthPlaceError("")
+      setLocationLoading((curr) => ({ ...curr, birth_place: false }))
+      return () => {
+        cancelled = true
+        controller.abort()
+      }
+    }
+
+    let detailedApplied = false
+
+    const ensureCountryCityList = async () => {
+      let cityList = locationCacheRef.current.citiesByCountry[country]
+      if (cityList) return cityList
+      const response = await fetch(buildLocationUrl("/countries/cities"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ country }),
+        signal: controller.signal,
+      })
+      const data = await response.json()
+      cityList = (data?.data || [])
+        .map((c) => String(c || "").trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b))
+      if (!cancelled) locationCacheRef.current.citiesByCountry[country] = cityList
+      return cityList
+    }
+
+    // Always try to show country city matches immediately (fast filtering).
+    ;(async () => {
+      try {
+        const cityList = await ensureCountryCityList()
+        if (cancelled) return
+        const q = query.toLowerCase()
+        const filtered = cityList.filter((name) => name.toLowerCase().startsWith(q)).slice(0, 60)
+        if (!detailedApplied) setBirthPlaceOptions(filtered)
+      } catch (error) {
+        if (error?.name === "AbortError") return
+        console.error("Failed to load country cities", error)
+        if (!cancelled) setBirthPlaceError("Could not load city list. You can still type your city manually.")
+      }
+    })()
+
+    // For 2+ letters, also fetch detailed place labels; if it returns empty, keep the country-city list.
+    if (query.length < 2) {
+      setLocationLoading((curr) => ({ ...curr, birth_place: false }))
+      return () => {
+        cancelled = true
+        controller.abort()
+      }
+    }
+
+    // Show loading but keep current options visible.
+    setLocationLoading((curr) => ({ ...curr, birth_place: true }))
+    setBirthPlaceError("")
+
+    const timeout = setTimeout(async () => {
       try {
         const iso2 = locationCacheRef.current.countryIso2ByName[country]
         const q = iso2 ? query : `${query}, ${country}`
@@ -445,8 +500,11 @@ function UserForm() {
           })
 
         if (cancelled) return
-        locationCacheRef.current.birthPlaceByCountryQuery[cacheKey] = list
-        setBirthPlaceOptions(list)
+        if (list.length > 0) {
+          detailedApplied = true
+          locationCacheRef.current.birthPlaceByCountryQuery[cacheKey] = list
+          setBirthPlaceOptions(list)
+        }
       } catch (error) {
         if (error?.name === "AbortError") return
         console.error("Failed to search places", error)
