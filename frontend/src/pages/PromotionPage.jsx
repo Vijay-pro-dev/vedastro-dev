@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import "../tailwind.css"
-import "./PromotionPage.css"
+import "../styles/pages/PromotionExtra.css"
 import {
   LuActivity,
   LuBriefcase,

@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import "../tailwind.css"
+import "../styles/pages/Questionnaire.css"
+import "../styles/pages/Dashboard.css"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
 import { FiArrowLeft, FiArrowRight } from "react-icons/fi"
+import PageLoader from "../components/shared/PageLoader"
 
 const LOCAL_QUESTION_CACHE_KEY = "vedastro_admin_questions_cache"
 
@@ -153,11 +156,7 @@ function Questionnaire() {
     return (
       <div className="landing">
         <div className="questionnaire-shell questionnaire-shell--landing">
-          <div className="skeleton-card">
-            <div className="skeleton-line" />
-            <div className="skeleton-line" />
-            <div className="skeleton-line short" />
-          </div>
+          <PageLoader message="Loading questionnaire..." />
         </div>
       </div>
     )

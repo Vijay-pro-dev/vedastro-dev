@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import "../tailwind.css"
+import "../styles/pages/Dashboard.css"
 
 import { api } from "../lib/api"
 import { loadRazorpay } from "../lib/razorpay"

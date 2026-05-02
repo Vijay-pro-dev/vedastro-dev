@@ -2,6 +2,7 @@
 import { useLocation, useNavigate } from "react-router-dom"
 import { FaArrowLeft, FaArrowUp, FaTimes } from "react-icons/fa"
 import "../tailwind.css"
+import "../styles/pages/Dashboard.css"
 import {
   Area,
   AreaChart,
@@ -19,6 +20,7 @@ import {
 import GuidancePanel from "../components/dashboard/GuidancePanel"
 import InsightCards from "../components/dashboard/InsightCards"
 import { useToast } from "../components/shared/ToastProvider"
+import useScrollReveal from "../hooks/useScrollReveal"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
 
@@ -235,13 +237,15 @@ function Dashboard() {
     { subject: "Role Fit", A: data.user_profile?.role_match === "high" ? 85 : data.user_profile?.role_match === "medium" ? 65 : 40 },
   ]
 
+  useScrollReveal()
+
   return (
     <div className="landing">
       <div className="ultra-dashboard ultra-dashboard--landing">
         <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
           <FaArrowLeft />
         </button>
-      <div className="dashboard-header">
+      <div className="dashboard-header scroll-reveal">
         <h1>{t.dashboard}</h1>
         <div className="tab-buttons">
           <button className={`tab-btn ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>{t.overview}</button>
@@ -267,7 +271,7 @@ function Dashboard() {
       </div>
 
       {activeTab === "overview" && (
-        <div className="ultra-grid">
+        <div className="ultra-grid scroll-reveal">
           <div className="ultra-card score-card">
             <h3>Career Alignment Score</h3>
             <div className="circle">
@@ -382,7 +386,7 @@ function Dashboard() {
       )}
 
       {activeTab === "insights" && (
-        <div className={`insights-section ${!user ? "locked-blur" : ""}`}>
+        <div className={`insights-section ${!user ? "locked-blur" : ""} scroll-reveal`}>
           <InsightCards
             careerPhase={data.current_career_phase}
             alignmentScore={data.career_alignment_score}
@@ -418,8 +422,8 @@ function Dashboard() {
       )}
 
       {activeTab === "trends" && (
-        <div className={`trends-section ${!user ? "locked-blur" : ""}`}>
-          <div className="ultra-grid">
+        <div className={`trends-section ${!user ? "locked-blur" : ""} scroll-reveal`}>
+          <div className="ultra-grid scroll-reveal">
             <div className="ultra-card full-width">
               <h3>Career Score Evolution</h3>
               <ResponsiveContainer width="100%" height={300}>

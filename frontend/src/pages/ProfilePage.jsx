@@ -1,5 +1,8 @@
 ﻿import { useEffect, useState } from "react"
 import { FaArrowLeft } from "react-icons/fa"
+import "../styles/common/resultsBase.css"
+import "../styles/pages/ProfilePage.css"
+import PageLoader from "../components/shared/PageLoader"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
@@ -152,16 +155,7 @@ function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="profile-page-shell">
-        <div className="profile-summary-grid">
-          {[1, 2, 3, 4].map((item) => (
-            <div key={item} className="skeleton-card">
-              <div className="skeleton-line short" />
-              <div className="skeleton-line" />
-            </div>
-          ))}
-        </div>
-      </div>
+      <PageLoader message="Loading profile..." />
     )
   }
 

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { FaArrowLeft, FaLightbulb } from "react-icons/fa"
+import "../tailwind.css"
+import "../styles/pages/ProfileMenu.css"
 
 import { api } from "../lib/api"
 import { useUser } from "../context/UserContext"

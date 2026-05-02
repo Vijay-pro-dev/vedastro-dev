@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { FaArrowLeft } from "react-icons/fa"
 import "../tailwind.css"
+import "../styles/pages/Dashboard.css"
 import { api } from "../lib/api"
 
 const Icon = ({ d }) => (

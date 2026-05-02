@@ -1,6 +1,8 @@
 ﻿import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { FaArrowLeft } from "react-icons/fa"
+import "../tailwind.css"
+import "../styles/pages/Auth.css"
 
 import { api } from "../lib/api"
 

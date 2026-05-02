@@ -1,5 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import "../tailwind.css"
+import "../styles/pages/AdminPanel.css"
 import {
   FaArrowLeft,
   FaBars,
@@ -1527,16 +1529,9 @@ function AdminPanel() {
     return (
       <div className="admin-panel-page">
         <div className="admin-panel-shell">
-          <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Go back">
-            <FaArrowLeft />
-          </button>
-          <div className="admin-stats-grid">
-            {[1, 2, 3, 4].map((item) => (
-              <div key={item} className="skeleton-card">
-                <div className="skeleton-line short" />
-                <div className="skeleton-line" />
-              </div>
-            ))}
+          <div className="admin-page-loader" role="status" aria-live="polite">
+            <div className="page-loader-spinner" />
+            <p>Loading admin panel...</p>
           </div>
         </div>
       </div>

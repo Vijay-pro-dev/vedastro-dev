@@ -1,7 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import { lazy, Suspense } from "react"
 
-import "./App.css"
+import "./styles/global.css"
 import AdminRoute from "./components/shared/AdminRoute"
 import PageLoader from "./components/shared/PageLoader"
 import ScrollToTop from "./components/shared/ScrollToTop"

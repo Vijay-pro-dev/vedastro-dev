@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import BirthTimeQuestionnaire from "../components/profile/BirthTimeQuestionnaire"
+import "../tailwind.css"
+import "../styles/pages/UserForm.css"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"

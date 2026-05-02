@@ -2,7 +2,10 @@
 import { useLocation, useNavigate } from "react-router-dom"
 import { FaArrowLeft, FaArrowUp, FaBullseye, FaShieldAlt } from "react-icons/fa"
 import "../tailwind.css"
+import "../styles/common/resultsBase.css"
+import "../styles/pages/Results.css"
 import { api } from "../lib/api"
+import useScrollReveal from "../hooks/useScrollReveal"
 
 const Icon = ({ d }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -124,6 +127,7 @@ function Results() {
   const [showTop, setShowTop] = useState(false)
   const [reportPaid, setReportPaid] = useState(false)
   const [showTimeline, setShowTimeline] = useState(false)
+  useScrollReveal()
 
   // Try to hydrate answers/questions from backend if authenticated
   useEffect(() => {
@@ -506,7 +510,7 @@ function Results() {
         </div>
         <section
           aria-labelledby="nd-current-state"
-          className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#070708] px-6 py-7 text-left shadow-[0_28px_70px_rgba(0,0,0,0.55)] md:px-9 md:py-9"
+          className="scroll-reveal relative overflow-hidden rounded-[24px] border border-white/10 bg-[#070708] px-6 py-7 text-left shadow-[0_28px_70px_rgba(0,0,0,0.55)] md:px-9 md:py-9"
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(212,175,55,0.18),transparent_56%),radial-gradient(circle_at_82%_22%,rgba(34,211,238,0.12),transparent_62%),radial-gradient(circle_at_78%_58%,rgba(168,85,247,0.10),transparent_60%),linear-gradient(180deg,#0b0c0d_0%,#050607_100%)] opacity-95" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(255,255,255,0.06),transparent_52%)]" />
@@ -613,7 +617,7 @@ function Results() {
           </div>
         </section>
 
-        <section className="card nd-forecast" aria-labelledby="nd-forecast-title">
+        <section className="card nd-forecast scroll-reveal" aria-labelledby="nd-forecast-title">
           <p className="nd-kicker" id="nd-forecast-title">TODAY & NEXT 7 DAYS</p>
           <div className="nd-forecast-row" role="list" aria-label="7 day forecast summary">
             <div className="nd-forecast-slot" role="listitem">
@@ -643,7 +647,7 @@ function Results() {
           </div>
         </section>
 
-        <section className="card nd-core" aria-labelledby="nd-core-title">
+        <section className="card nd-core scroll-reveal" aria-labelledby="nd-core-title">
           <div className="card-header nd-core-head">
             <h3 id="nd-core-title">YOUR CORE METRICS</h3>
             <span className="pill dark">Out of 100</span>
@@ -688,7 +692,7 @@ function Results() {
           </div>
         </section>
 
-        <section className="nd-split" aria-label="Rules and elements">
+        <section className="nd-split scroll-reveal" aria-label="Rules and elements">
           <div className="card nd-rule" aria-labelledby="nd-rule-title">
             <div className="card-header nd-tight">
               <h3 id="nd-rule-title">TOP RULE MATCH</h3>
@@ -777,7 +781,7 @@ function Results() {
           </div>
         </section>
 
-        <section className="card nd-guidance" aria-labelledby="nd-guidance-title">
+        <section className="card nd-guidance scroll-reveal" aria-labelledby="nd-guidance-title">
           <div className="card-header nd-tight">
             <h3 id="nd-guidance-title">YOUR GUIDANCE</h3>
             <span className="pill dark">Focus</span>
@@ -818,7 +822,7 @@ function Results() {
           </div>
         </section>
 
-        <section className="card nd-report" aria-label="Full report">
+        <section className="card nd-report scroll-reveal" aria-label="Full report">
           <div className="nd-report-bar">
             <div className="nd-report-left">
               <span className="nd-report-ico" aria-hidden="true"><Icon d={ICONS.spark} /></span>
