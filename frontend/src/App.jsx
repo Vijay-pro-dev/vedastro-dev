@@ -8,6 +8,7 @@ import ScrollToTop from "./components/shared/ScrollToTop"
 import { ToastProvider } from "./components/shared/ToastProvider"
 import { UserProvider } from "./context/UserContext"
 import ProtectedRoute from "./components/shared/ProtectedRoute"
+import ErrorBoundary from "./components/shared/ErrorBoundary"
 
 const AdminLogin = lazy(() => import("./pages/AdminLogin"))
 const AdminPanel = lazy(() => import("./pages/AdminPanel"))
@@ -48,7 +49,14 @@ function App() {
               <Route path="/form" element={<UserForm />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/questionnaire" element={<Questionnaire />} />
-              <Route path="/newdashboard" element={<Results />} />
+              <Route
+                path="/newdashboard"
+                element={
+                  <ErrorBoundary>
+                    <Results />
+                  </ErrorBoundary>
+                }
+              />
               <Route
                 path="/report/unlock"
                 element={
