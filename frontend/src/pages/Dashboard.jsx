@@ -38,6 +38,7 @@ function Dashboard() {
   const performanceRef = useRef(null)
   const accuracyDismissed = useRef(false)
   const [showTop, setShowTop] = useState(false)
+  useScrollReveal()
 
   // If user already answered questionnaire, always use new dashboard
   useEffect(() => {
@@ -162,6 +163,7 @@ function Dashboard() {
   // Show modal when performance summary scrolls into view (trends tab)
   useEffect(() => {
     if (activeTab !== "trends") return
+    if (typeof IntersectionObserver === "undefined") return
     const node = performanceRef.current
     if (!node) return
     const observer = new IntersectionObserver(
@@ -237,8 +239,6 @@ function Dashboard() {
     { subject: "Clarity", A: data.user_profile?.goal_clarity === "high" ? 85 : data.user_profile?.goal_clarity === "medium" ? 65 : 40 },
     { subject: "Role Fit", A: data.user_profile?.role_match === "high" ? 85 : data.user_profile?.role_match === "medium" ? 65 : 40 },
   ]
-
-  useScrollReveal()
 
   return (
     <div className="landing">
