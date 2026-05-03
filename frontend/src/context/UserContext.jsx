@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import { api } from "../lib/api"
 import { getTranslations } from "../lib/i18n"
+import { safeStorage } from "../lib/storage"
 
 const UserContext = createContext()
 
@@ -14,8 +15,8 @@ export function UserProvider({ children }) {
 
   useEffect(() => {
     const hydrateUser = async () => {
-      const token = localStorage.getItem("token")
-      const storedUser = localStorage.getItem("user")
+      const token = safeStorage.get("token")
+      const storedUser = safeStorage.get("user")
 
       if (!token) {
         setLoading(false)
@@ -26,7 +27,7 @@ export function UserProvider({ children }) {
         try {
           setUser(JSON.parse(storedUser))
         } catch {
-          localStorage.removeItem("user")
+          safeStorage.remove("user")
         }
       }
 
@@ -36,11 +37,11 @@ export function UserProvider({ children }) {
           ...response.data,
           user_id: response.data.user_id,
         }
-        localStorage.setItem("user", JSON.stringify(nextUser))
+        safeStorage.set("user", JSON.stringify(nextUser))
         setUser(nextUser)
       } catch {
-        localStorage.removeItem("token")
-        localStorage.removeItem("user")
+        safeStorage.remove("token")
+        safeStorage.remove("user")
         setUser(null)
       } finally {
         setLoading(false)
@@ -51,15 +52,15 @@ export function UserProvider({ children }) {
   }, [])
 
   const loginUser = ({ access_token, refresh_token, user: userData }) => {
-    localStorage.setItem("token", access_token)
+    safeStorage.set("token", access_token)
     if (refresh_token) {
-      localStorage.setItem("refresh_token", refresh_token)
+      safeStorage.set("refresh_token", refresh_token)
     }
-    localStorage.setItem("user", JSON.stringify(userData))
-    localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
+    safeStorage.set("user", JSON.stringify(userData))
+    safeStorage.set(LAST_ACTIVE_KEY, String(Date.now()))
     if (userData?.role === "admin") {
-      localStorage.setItem("admin_token", access_token)
-      localStorage.setItem(
+      safeStorage.set("admin_token", access_token)
+      safeStorage.set(
         "admin_user",
         JSON.stringify({
           email: userData.email,
@@ -73,19 +74,19 @@ export function UserProvider({ children }) {
   }
 
   const logoutUser = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("refresh_token")
-    localStorage.removeItem("user")
-    localStorage.removeItem("admin_token")
-    localStorage.removeItem("admin_user")
-    localStorage.removeItem(LAST_ACTIVE_KEY)
+    safeStorage.remove("token")
+    safeStorage.remove("refresh_token")
+    safeStorage.remove("user")
+    safeStorage.remove("admin_token")
+    safeStorage.remove("admin_user")
+    safeStorage.remove(LAST_ACTIVE_KEY)
     setUser(null)
   }
 
   const updateUser = (userData) => {
-    localStorage.setItem("user", JSON.stringify(userData))
+    safeStorage.set("user", JSON.stringify(userData))
     if (userData?.role === "admin") {
-      localStorage.setItem(
+      safeStorage.set(
         "admin_user",
         JSON.stringify({
           email: userData.email,
@@ -109,11 +110,11 @@ export function UserProvider({ children }) {
       const now = Date.now()
       if (now - lastWriteAt < 10_000) return
       lastWriteAt = now
-      localStorage.setItem(LAST_ACTIVE_KEY, String(now))
+      safeStorage.set(LAST_ACTIVE_KEY, String(now))
     }
 
     const checkIdle = () => {
-      const raw = localStorage.getItem(LAST_ACTIVE_KEY)
+      const raw = safeStorage.get(LAST_ACTIVE_KEY)
       const lastActiveAt = raw ? Number(raw) : Date.now()
       if (Number.isNaN(lastActiveAt)) return
 

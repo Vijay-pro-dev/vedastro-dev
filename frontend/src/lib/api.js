@@ -1,4 +1,5 @@
 import axios from "axios"
+import { safeStorage } from "./storage"
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL
 const currentHost = typeof window !== "undefined" ? window.location.hostname : "127.0.0.1"
@@ -16,7 +17,7 @@ export const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token")
+  const token = safeStorage.get("token")
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -44,7 +45,7 @@ api.interceptors.response.use(
       !requestUrl.includes("/login") &&
       !requestUrl.includes("/signup")
     ) {
-      const refreshToken = localStorage.getItem("refresh_token")
+      const refreshToken = safeStorage.get("refresh_token")
       if (refreshToken) {
         try {
           originalRequest._retry = true
@@ -56,12 +57,12 @@ api.interceptors.response.use(
           const refreshResponse = await refreshPromise
           refreshPromise = null
 
-          localStorage.setItem("token", refreshResponse.data.access_token)
+          safeStorage.set("token", refreshResponse.data.access_token)
           if (refreshResponse.data.refresh_token) {
-            localStorage.setItem("refresh_token", refreshResponse.data.refresh_token)
+            safeStorage.set("refresh_token", refreshResponse.data.refresh_token)
           }
           if (refreshResponse.data.user) {
-            localStorage.setItem("user", JSON.stringify(refreshResponse.data.user))
+            safeStorage.set("user", JSON.stringify(refreshResponse.data.user))
           }
 
           originalRequest.headers = originalRequest.headers || {}
@@ -75,9 +76,9 @@ api.interceptors.response.use(
 
     // If an old token becomes invalid, clear local session so protected screens recover cleanly.
     if (status === 401 && isSessionEndpoint) {
-      localStorage.removeItem("token")
-      localStorage.removeItem("refresh_token")
-      localStorage.removeItem("user")
+      safeStorage.remove("token")
+      safeStorage.remove("refresh_token")
+      safeStorage.remove("user")
     }
 
     return Promise.reject(error)

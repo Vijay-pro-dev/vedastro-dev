@@ -23,6 +23,7 @@ import { useToast } from "../components/shared/ToastProvider"
 import useScrollReveal from "../hooks/useScrollReveal"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
+import { safeStorage } from "../lib/storage"
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -40,16 +41,16 @@ function Dashboard() {
 
   // If user already answered questionnaire, always use new dashboard
   useEffect(() => {
-    const token = localStorage.getItem("token")
+    const token = safeStorage.get("token")
     if (!token) return
     let answered = false
     try {
-      const parsed = JSON.parse(localStorage.getItem("guest_questionnaire_answers") || "{}")
+      const parsed = JSON.parse(safeStorage.get("guest_questionnaire_answers") || "{}")
       answered = parsed && Object.keys(parsed).length > 0
     } catch {
       answered = false
     }
-    const completedFlag = localStorage.getItem("questionnaire_completed") === "true"
+    const completedFlag = safeStorage.get("questionnaire_completed") === "true"
     if (completedFlag && answered) {
       navigate("/newdashboard", { replace: true })
     }
@@ -98,10 +99,10 @@ function Dashboard() {
 
   useEffect(() => {
     const loadDashboard = async () => {
-      const token = localStorage.getItem("token")
+      const token = safeStorage.get("token")
       if (!token) {
         // guest view: use draft data or defaults
-        const draft = location.state?.guestProfile || JSON.parse(localStorage.getItem("guest_profile_draft") || "{}")
+        const draft = location.state?.guestProfile || JSON.parse(safeStorage.get("guest_profile_draft") || "{}")
         const flatDraft =
           draft && (draft.formData || draft.careerData)
             ? { ...(draft.formData || {}), ...(draft.careerData || {}) }
