@@ -7,6 +7,7 @@ export default function useScrollReveal({
 } = {}) {
   useEffect(() => {
     if (typeof window === "undefined") return undefined
+    if (typeof IntersectionObserver === "undefined") return undefined
 
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
     if (prefersReducedMotion) return undefined
@@ -27,4 +28,3 @@ export default function useScrollReveal({
     return () => observer.disconnect()
   }, [selector, rootMargin, threshold])
 }
-

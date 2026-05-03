@@ -7,6 +7,14 @@ import "../styles/pages/Results.css"
 import { api } from "../lib/api"
 import useScrollReveal from "../hooks/useScrollReveal"
 
+const safeLocalStorageGet = (key) => {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
 const Icon = ({ d }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d={d} />
@@ -131,7 +139,7 @@ function Results() {
 
   // Try to hydrate answers/questions from backend if authenticated
   useEffect(() => {
-    const token = localStorage.getItem("token")
+    const token = safeLocalStorageGet("token")
     if (!token) return
     const load = async () => {
       try {
@@ -177,7 +185,7 @@ function Results() {
   }, [])
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
+    const token = safeLocalStorageGet("token")
     if (!token) return
     api
       .get("/payments/report/status")
@@ -210,7 +218,7 @@ function Results() {
     const fromState = location.state?.answers || {}
     let stored = {}
     try {
-      stored = JSON.parse(localStorage.getItem("guest_questionnaire_answers") || "{}")
+      stored = JSON.parse(safeLocalStorageGet("guest_questionnaire_answers") || "{}")
     } catch {
       stored = {}
     }
@@ -222,7 +230,7 @@ function Results() {
     const fromState = location.state?.questions || []
     let stored = []
     try {
-      stored = JSON.parse(localStorage.getItem("guest_questionnaire_questions") || "[]")
+      stored = JSON.parse(safeLocalStorageGet("guest_questionnaire_questions") || "[]")
     } catch {
       stored = []
     }
