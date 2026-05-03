@@ -28,6 +28,7 @@ body {
   --landing-muted: rgba(255, 255, 255, 0.66);
   --landing-card: #141414;
   --landing-border: rgba(255, 255, 255, 0.085);
+  /* Promotion palette (Tailwind theme tokens) */
   --landing-gold: #d4af37;
   --landing-gold-strong: #b8941f;
 
@@ -38,9 +39,14 @@ body {
   min-height: 100vh;
   font-family: "Sora", "Inter", "Poppins", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   color: var(--landing-text);
-  background: radial-gradient(circle at 18% 6%, rgba(214, 179, 74, 0.13), transparent 46%),
+  background: radial-gradient(circle at 18% 6%, rgba(212, 175, 55, 0.13), transparent 46%),
     radial-gradient(circle at 88% 10%, rgba(255, 255, 255, 0.06), transparent 56%),
     linear-gradient(180deg, #050506 0%, #0b0c0d 44%, #05060a 100%);
+  background-color: #050506;
+  background-repeat: no-repeat;
+  background-position: center top, center top, center top;
+  /* Scale glows with viewport to avoid visible edges on wide screens */
+  background-size: max(1200px, 100vw) max(820px, 100vh), max(1200px, 100vw) max(820px, 100vh), auto;
 }
 
 /* Ultra-smooth scroll reveal (shared) */
@@ -125,6 +131,7 @@ body {
   max-width: 420px;
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 14px;
   padding: 14px 16px;
   border-radius: 14px;
@@ -143,4 +150,40 @@ body {
 .toast-card p {
   margin: 0;
   color: #cbd5e1;
+}
+
+.toast-close {
+  width: 34px;
+  height: 34px;
+  align-self: flex-start;
+  border-radius: 12px;
+  border: none;
+  background: rgba(2, 6, 23, 0.35);
+  color: #cbd5e1;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  flex: 0 0 auto;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.toast-close:hover {
+  transform: translateY(-1px);
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #e2e8f0;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+}
+
+.toast-close:active {
+  transform: translateY(0);
+}
+
+.toast-close:focus-visible {
+  outline: 2px solid rgba(212, 175, 55, 0.65);
+  outline-offset: 2px;
 }

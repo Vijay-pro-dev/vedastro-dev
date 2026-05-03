@@ -35,7 +35,7 @@ import useScrollReveal from "../hooks/useScrollReveal"
 function LandingPage() {
   const navigate = useNavigate()
   const { user, logoutUser, loginUser, updateUser } = useUser()
-  useScrollReveal()
+  useScrollReveal({ selector: ".scroll-reveal:not(.landing-feature-card):not(.landing-proof-tile):not(.landing-trap-card):not(.landing-usecase-item)" })
 
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL || "https://instagram.com/"
   const facebookUrl = import.meta.env.VITE_FACEBOOK_URL || "https://facebook.com/"
@@ -59,6 +59,186 @@ function LandingPage() {
   const [resetPassword, setResetPassword] = useState("")
   const languageMenuRef = useRef(null)
   const profileMenuRef = useRef(null)
+  const hasInitSequentialFeatures = useRef(false)
+  const hasInitSequentialProofTiles = useRef(false)
+  const hasInitSequentialTrapCards = useRef(false)
+  const hasInitSequentialUsecases = useRef(false)
+
+  useEffect(() => {
+    if (hasInitSequentialFeatures.current) return
+    hasInitSequentialFeatures.current = true
+
+    if (typeof window === "undefined") return
+    if (typeof IntersectionObserver === "undefined") return
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+    if (prefersReducedMotion) return
+
+    const cards = Array.from(document.querySelectorAll(".landing-feature-card"))
+    if (cards.length === 0) return
+
+    cards.forEach((el) => el.classList.remove("is-visible"))
+
+    let idx = 0
+    let observer = null
+
+    const observeNext = () => {
+      if (observer) observer.disconnect()
+      if (idx >= cards.length) return
+
+      const el = cards[idx]
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return
+            entry.target.classList.add("is-visible")
+            observer.unobserve(entry.target)
+            idx += 1
+            window.setTimeout(observeNext, 450)
+          })
+        },
+        { threshold: 0.18, rootMargin: "0px 0px -18% 0px" },
+      )
+      observer.observe(el)
+    }
+
+    observeNext()
+
+    return () => {
+      if (observer) observer.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (hasInitSequentialProofTiles.current) return
+    hasInitSequentialProofTiles.current = true
+
+    if (typeof window === "undefined") return
+    if (typeof IntersectionObserver === "undefined") return
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+    if (prefersReducedMotion) return
+
+    const tiles = Array.from(document.querySelectorAll(".landing-proof-tile"))
+    if (tiles.length === 0) return
+
+    tiles.forEach((el) => el.classList.remove("is-visible"))
+
+    let idx = 0
+    let observer = null
+
+    const observeNext = () => {
+      if (observer) observer.disconnect()
+      if (idx >= tiles.length) return
+
+      const el = tiles[idx]
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return
+            entry.target.classList.add("is-visible")
+            observer.unobserve(entry.target)
+            idx += 1
+            window.setTimeout(observeNext, 520)
+          })
+        },
+        { threshold: 0.22, rootMargin: "0px 0px -18% 0px" },
+      )
+      observer.observe(el)
+    }
+
+    observeNext()
+
+    return () => {
+      if (observer) observer.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (hasInitSequentialTrapCards.current) return
+    hasInitSequentialTrapCards.current = true
+
+    if (typeof window === "undefined") return
+    if (typeof IntersectionObserver === "undefined") return
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+    if (prefersReducedMotion) return
+
+    const cards = Array.from(document.querySelectorAll(".landing-trap-card"))
+    if (cards.length === 0) return
+
+    cards.forEach((el) => el.classList.remove("is-visible"))
+
+    let idx = 0
+    let observer = null
+
+    const observeNext = () => {
+      if (observer) observer.disconnect()
+      if (idx >= cards.length) return
+
+      const el = cards[idx]
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return
+            entry.target.classList.add("is-visible")
+            observer.unobserve(entry.target)
+            idx += 1
+            window.setTimeout(observeNext, 520)
+          })
+        },
+        { threshold: 0.22, rootMargin: "0px 0px -18% 0px" },
+      )
+      observer.observe(el)
+    }
+
+    observeNext()
+
+    return () => {
+      if (observer) observer.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (hasInitSequentialUsecases.current) return
+    hasInitSequentialUsecases.current = true
+
+    if (typeof window === "undefined") return
+    if (typeof IntersectionObserver === "undefined") return
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+    if (prefersReducedMotion) return
+
+    const cards = Array.from(document.querySelectorAll(".landing-usecase-item"))
+    if (cards.length === 0) return
+
+    cards.forEach((el) => el.classList.remove("is-visible"))
+
+    let idx = 0
+    let observer = null
+
+    const observeNext = () => {
+      if (observer) observer.disconnect()
+      if (idx >= cards.length) return
+
+      const el = cards[idx]
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return
+            entry.target.classList.add("is-visible")
+            observer.unobserve(entry.target)
+            idx += 1
+            window.setTimeout(observeNext, 420)
+          })
+        },
+        { threshold: 0.22, rootMargin: "0px 0px -18% 0px" },
+      )
+      observer.observe(el)
+    }
+
+    observeNext()
+
+    return () => {
+      if (observer) observer.disconnect()
+    }
+  }, [])
   const activeLanguage = user?.language || landingLanguage
   const pageT = getTranslations(activeLanguage)
   const signupT = pageT
@@ -263,7 +443,7 @@ function LandingPage() {
 
   return (
     <div className="landing">
-      <nav className="navbar ">
+      <nav className="navbar bg-bg/70 backdrop-blur-xl border-b border-cardBorder/60">
         <div className="landing-brand" role="button" tabIndex={0} onClick={() => navigate("/")}>
           <span className="landing-brand-badge" aria-hidden="true">
             <img className="landing-brand-image" src={vedastroLogo} alt="" loading="eager" decoding="async" />
@@ -275,7 +455,7 @@ function LandingPage() {
           {user && (
             <button
               type="button"
-              className="landing-nav-cta"
+              className="landing-nav-cta "
               onClick={() => {
                 setShowLanguageDropdown(false)
                 setShowProfileDropdown(false)
@@ -289,7 +469,7 @@ function LandingPage() {
           {user && (
             <button
               type="button"
-              className="landing-nav-cta landing-nav-profile"
+              className="landing-nav-cta landing-nav-profile shadow-soft"
               onClick={() => {
                 setShowLanguageDropdown(false)
                 setShowProfileDropdown(false)
@@ -303,7 +483,7 @@ function LandingPage() {
           {!user && (
             <button
               type="button"
-              className="landing-nav-login"
+              className="landing-nav-login bg-card/50 border border-cardBorder/60 backdrop-blur-xl shadow-soft"
               onClick={() => {
                 resetAuthForm()
                 setShowLoginModal(true)
@@ -341,7 +521,7 @@ function LandingPage() {
             <div className="profile-menu" ref={profileMenuRef}>
               <button
                 type="button"
-                className="profile-btn"
+                className="profile-btn bg-card/50 border border-cardBorder/60 backdrop-blur-xl shadow-soft"
                 aria-haspopup="menu"
                 aria-expanded={showProfileDropdown}
                 aria-controls="profile-dropdown-menu"
@@ -355,7 +535,7 @@ function LandingPage() {
               </button>
 
               {showProfileDropdown && (
-                <div className="profile-dropdown" id="profile-dropdown-menu" role="menu" aria-label="Profile menu">
+                <div className="profile-dropdown bg-bg/80 backdrop-blur-xl border border-cardBorder/60 shadow-soft" id="profile-dropdown-menu" role="menu" aria-label="Profile menu">
                   <div className="dropdown-user">
                     <strong>{user.name || user.email?.split("@")[0]}</strong>
                     <span>{user.profile_completed ? pageT.dashboardReady : pageT.profilePending}</span>
@@ -563,17 +743,17 @@ function LandingPage() {
       <section className="features">
         <h2>{pageT.builtFor}</h2>
           <div className="feature-grid scroll-reveal">
-            <div className="feature">
+            <div className="feature landing-feature-card scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft">
               <FaChartLine size={30} color="#d6b34a" />
               <h3>{pageT.dynamicScore}</h3>
               <p>{pageT.dynamicScoreSub}</p>
             </div>
-            <div className="feature">
+            <div className="feature landing-feature-card scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft">
               <FaClock size={30} color="#d6b34a" />
               <h3>{pageT.savedWindow}</h3>
               <p>{pageT.savedWindowSub}</p>
             </div>
-            <div className="feature">
+            <div className="feature landing-feature-card scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft">
               <FaLightbulb size={30} color="#d6b34a" />
               <h3>{pageT.aiRecommendations}</h3>
               <p>{pageT.aiRecommendationsSub}</p>
@@ -590,25 +770,25 @@ function LandingPage() {
           </p>
 
           <div className="landing-tile-grid scroll-reveal" role="list">
-            <div className="landing-tile" role="listitem">
+            <div className="landing-tile landing-proof-tile scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-tile-icon" aria-hidden="true">
                 <FaShieldAlt />
               </span>
               <span className="landing-tile-label">Data Encrypted</span>
             </div>
-            <div className="landing-tile" role="listitem">
+            <div className="landing-tile landing-proof-tile scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-tile-icon" aria-hidden="true">
                 <FaCogs />
               </span>
               <span className="landing-tile-label">Pattern Engine</span>
             </div>
-            <div className="landing-tile" role="listitem">
+            <div className="landing-tile landing-proof-tile scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-tile-icon" aria-hidden="true">
                 <FaBolt />
               </span>
               <span className="landing-tile-label">Real-time Analysis</span>
             </div>
-            <div className="landing-tile" role="listitem">
+            <div className="landing-tile landing-proof-tile scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-tile-icon" aria-hidden="true">
                 <FaLock />
               </span>
@@ -624,21 +804,21 @@ function LandingPage() {
           <p className="landing-section-subtitle scroll-reveal">Intelligence alone doesn&apos;t protect you from these three traps.</p>
 
           <div className="landing-card-grid scroll-reveal" role="list">
-            <article className="landing-card" role="listitem">
+            <article className="landing-card landing-trap-card scroll-reveal shadow-card" role="listitem">
               <span className="landing-card-icon" aria-hidden="true">
                 <FaEyeSlash />
               </span>
               <h3>Clarity</h3>
               <p>You can&apos;t see clearly. Fog in your judgment distorts what feels like a good choice.</p>
             </article>
-            <article className="landing-card" role="listitem">
+            <article className="landing-card landing-trap-card scroll-reveal shadow-card" role="listitem">
               <span className="landing-card-icon" aria-hidden="true">
                 <FaBolt />
               </span>
               <h3>Behavior</h3>
               <p>You react emotionally or impulsively. Speed without awareness compounds errors.</p>
             </article>
-            <article className="landing-card" role="listitem">
+            <article className="landing-card landing-trap-card scroll-reveal shadow-card" role="listitem">
               <span className="landing-card-icon" aria-hidden="true">
                 <FaClock />
               </span>
@@ -655,43 +835,43 @@ function LandingPage() {
           <p className="landing-section-subtitle scroll-reveal">When stakes are high, guessing is expensive.</p>
 
           <div className="landing-usecase-grid scroll-reveal" role="list">
-            <div className="landing-usecase" role="listitem">
+            <div className="landing-usecase landing-usecase-item scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-usecase-icon" aria-hidden="true">
                 <FaChartLine />
               </span>
               <span className="landing-usecase-label">Investing money</span>
             </div>
-            <div className="landing-usecase" role="listitem">
+            <div className="landing-usecase landing-usecase-item scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-usecase-icon" aria-hidden="true">
                 <FaExchangeAlt />
               </span>
               <span className="landing-usecase-label">Switching jobs</span>
             </div>
-            <div className="landing-usecase" role="listitem">
+            <div className="landing-usecase landing-usecase-item scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-usecase-icon" aria-hidden="true">
                 <FaHeart />
               </span>
               <span className="landing-usecase-label">Starting a relationship</span>
             </div>
-            <div className="landing-usecase" role="listitem">
+            <div className="landing-usecase landing-usecase-item scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-usecase-icon" aria-hidden="true">
                 <FaUsers />
               </span>
               <span className="landing-usecase-label">Business partnership</span>
             </div>
-            <div className="landing-usecase" role="listitem">
+            <div className="landing-usecase landing-usecase-item scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-usecase-icon" aria-hidden="true">
                 <FaUserPlus />
               </span>
               <span className="landing-usecase-label">Hiring someone</span>
             </div>
-            <div className="landing-usecase" role="listitem">
+            <div className="landing-usecase landing-usecase-item scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-usecase-icon" aria-hidden="true">
                 <FaShoppingBag />
               </span>
               <span className="landing-usecase-label">Major purchases</span>
             </div>
-            <div className="landing-usecase landing-usecase-wide" role="listitem">
+            <div className="landing-usecase landing-usecase-wide landing-usecase-item scroll-reveal bg-card/40 border border-cardBorder/60 backdrop-blur-xl shadow-soft" role="listitem">
               <span className="landing-usecase-icon" aria-hidden="true">
                 <FaComments />
               </span>

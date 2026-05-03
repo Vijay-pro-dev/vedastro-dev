@@ -95,8 +95,28 @@ function SearchSelect({
   const filtered = useMemo(() => {
     if (!Array.isArray(options) || options.length === 0) return []
     if (!normalizedQuery) return options.slice(0, maxResults)
-    return options.filter((opt) => String(opt).toLowerCase().includes(normalizedQuery)).slice(0, maxResults)
+
+    const tokens = normalizedQuery.split(/\s+/).filter(Boolean)
+
+    const matchesAllTokensAsWordPrefix = (rawOption) => {
+      const hay = String(rawOption).toLowerCase()
+      const words = hay
+        .replace(/[,/]+/g, " ")
+        .split(/\s+/)
+        .filter(Boolean)
+      if (words.length === 0) return false
+      return tokens.every((t) => words.some((w) => w.startsWith(t)))
+    }
+
+    return options.filter(matchesAllTokensAsWordPrefix).slice(0, maxResults)
   }, [options, normalizedQuery, maxResults])
+
+  const showSearching =
+    open &&
+    !disabled &&
+    Boolean(normalizedQuery) &&
+    !loading &&
+    (!Array.isArray(options) || options.length === 0)
 
   useEffect(() => {
     if (!open) return undefined
@@ -177,35 +197,42 @@ function SearchSelect({
         aria-invalid={Boolean(error)}
       />
 
-      {open && !disabled && (
-        <div
-          id={listId}
-          role="listbox"
-          style={{
-            position: "absolute",
-            zIndex: 50,
-            top: "calc(100% + 6px)",
-            left: 0,
-            right: 0,
-            maxHeight: 260,
-            overflowY: "auto",
-            background: "#fff",
-            border: "1px solid rgba(0,0,0,0.12)",
-            borderRadius: 8,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
-          }}
-        >
-          {loading && (
-            <div style={{ padding: "10px 12px", fontSize: 14, opacity: 0.8 }}>
-              Loading...
-            </div>
-          )}
+        {open && !disabled && (
+          <div
+            id={listId}
+            role="listbox"
+            style={{
+              position: "absolute",
+              zIndex: 50,
+              top: "calc(100% + 6px)",
+              left: 0,
+              right: 0,
+              maxHeight: 260,
+              overflowY: "auto",
+              background: "#fff",
+              color: "#111827",
+              border: "1px solid rgba(0,0,0,0.12)",
+              borderRadius: 8,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
+            }}
+          >
+            {showSearching && (
+              <div style={{ padding: "10px 12px", fontSize: 14, opacity: 0.85, color: "#111827" }}>
+                Searching...
+              </div>
+            )}
 
-          {!loading && filtered.length === 0 && (
-            <div style={{ padding: "10px 12px", fontSize: 14, opacity: 0.8 }}>
-              No results
-            </div>
-          )}
+            {loading && (
+              <div style={{ padding: "10px 12px", fontSize: 14, opacity: 0.85, color: "#111827" }}>
+                Loading...
+              </div>
+            )}
+
+            {!showSearching && !loading && filtered.length === 0 && (
+              <div style={{ padding: "10px 12px", fontSize: 14, opacity: 0.85, color: "#111827" }}>
+                No results
+              </div>
+            )}
 
           {filtered.map((opt, idx) => {
             const isActive = idx === activeIndex
@@ -224,6 +251,7 @@ function SearchSelect({
                   padding: "10px 12px",
                   cursor: "pointer",
                   background: isActive ? "rgba(59,130,246,0.14)" : "transparent",
+                  color: "#111827",
                 }}
               >
                 {opt}
@@ -434,43 +462,55 @@ function UserForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ country }),
-        signal: controller.signal,
       })
       const data = await response.json()
       cityList = (data?.data || [])
         .map((c) => String(c || "").trim())
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b))
-      if (!cancelled) locationCacheRef.current.citiesByCountry[country] = cityList
+      // Cache per-country city list even if the user keeps typing; we don't want
+      // per-keystroke effect cleanup to abort and restart this fetch forever.
+      locationCacheRef.current.citiesByCountry[country] = cityList
       return cityList
     }
 
+    const applyCityListMatches = async () => {
+      const cityList = await ensureCountryCityList()
+      if (cancelled) return
+      const q = query.toLowerCase()
+      const tokens = q.split(/\s+/).filter(Boolean)
+      const filtered = cityList
+        .filter((name) => {
+          const hay = name.toLowerCase()
+          const words = hay.replace(/[,/]+/g, " ").split(/\s+/).filter(Boolean)
+          if (words.length === 0) return false
+          return tokens.every((t) => words.some((w) => w.startsWith(t)))
+        })
+        .slice(0, 60)
+      if (!detailedApplied) setBirthPlaceOptions(filtered)
+    }
+
     // Always try to show country city matches immediately (fast filtering).
-    ;(async () => {
-      try {
-        const cityList = await ensureCountryCityList()
-        if (cancelled) return
-        const q = query.toLowerCase()
-        const filtered = cityList.filter((name) => name.toLowerCase().startsWith(q)).slice(0, 60)
-        if (!detailedApplied) setBirthPlaceOptions(filtered)
-      } catch (error) {
+    setLocationLoading((curr) => ({ ...curr, birth_place: true }))
+    applyCityListMatches()
+      .catch((error) => {
         if (error?.name === "AbortError") return
         console.error("Failed to load country cities", error)
         if (!cancelled) setBirthPlaceError("Could not load city list. You can still type your city manually.")
-      }
-    })()
+      })
+      .finally(() => {
+        if (!cancelled) setLocationLoading((curr) => ({ ...curr, birth_place: false }))
+      })
 
     // For 2+ letters, also fetch detailed place labels; if it returns empty, keep the country-city list.
     if (query.length < 2) {
-      setLocationLoading((curr) => ({ ...curr, birth_place: false }))
       return () => {
         cancelled = true
         controller.abort()
       }
     }
 
-    // Show loading but keep current options visible.
-    setLocationLoading((curr) => ({ ...curr, birth_place: true }))
+    // Detailed search happens in the background; keep current options visible.
     setBirthPlaceError("")
 
     const timeout = setTimeout(async () => {
@@ -511,8 +551,6 @@ function UserForm() {
         if (error?.name === "AbortError") return
         console.error("Failed to search places", error)
         if (!cancelled) setBirthPlaceError("Could not search cities. Please type your city manually.")
-      } finally {
-        if (!cancelled) setLocationLoading((curr) => ({ ...curr, birth_place: false }))
       }
     }, 250)
 
