@@ -721,6 +721,11 @@ box-shadow:0 6px 15px rgba(0,0,0,0.2);
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
+.landing .feature > svg {
+  display: block;
+  margin: 0 auto;
+}
+
 .landing .feature:hover {
   transform: translateY(-2px);
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.65);
@@ -857,7 +862,7 @@ box-shadow:0 6px 15px rgba(0,0,0,0.2);
     linear-gradient(180deg, rgba(20, 20, 20, 0.82), rgba(11, 11, 11, 0.94));
   border: 1px solid var(--landing-border);
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
-  text-align: left;
+  text-align: center;
   backdrop-filter: blur(22px);
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
@@ -881,6 +886,7 @@ box-shadow:0 6px 15px rgba(0,0,0,0.2);
   border-radius: 16px;
   display: grid;
   place-items: center;
+  margin: 0 auto;
   background: rgba(212, 175, 55, 0.14);
   border: 1px solid rgba(212, 175, 55, 0.26);
   color: rgba(212, 175, 55, 0.95);
@@ -914,7 +920,8 @@ box-shadow:0 6px 15px rgba(0,0,0,0.2);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--landing-border);
-  text-align: left;
+  text-align: center;
+  justify-items: center;
   box-shadow: 0 20px 52px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(18px);
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
@@ -953,10 +960,10 @@ box-shadow:0 6px 15px rgba(0,0,0,0.2);
 }
 
 .landing .landing-usecase-wide {
-  grid-column: span 3;
-  display: flex;
+  grid-column: auto;
+  display: grid;
+  gap: 10px;
   align-items: center;
-  gap: 12px;
 }
 
 @media (max-width: 640px) {
@@ -1080,6 +1087,19 @@ margin-top:10px;
 background:#eef1ff;
 text-align:center;
 padding:60px 20px;
+}
+
+/* Overrides: keep landing feature card content centered */
+.landing .features .feature {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.landing .features .feature h3,
+.landing .features .feature p {
+  text-align: center;
 }
 
 .testimonial h3{

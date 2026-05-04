@@ -1,8 +1,9 @@
 ﻿import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { FiArrowLeft, FiEye, FiEyeOff, FiLock, FiMail, FiUser, FiUserPlus } from "react-icons/fi"
+import { FiArrowLeft, FiArrowRight, FiEye, FiEyeOff, FiLock, FiMail, FiUser, FiUserPlus } from "react-icons/fi"
+import { FaApple } from "react-icons/fa"
 import "../tailwind.css"
-import "../styles/pages/Auth.css"
+import "../styles/pages/Signup.css"
 import { useToast } from "../components/shared/ToastProvider"
 import { useUser } from "../context/UserContext"
 import { api } from "../lib/api"
@@ -48,6 +49,23 @@ function Signup() {
   }
 
   const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+
+  const renderAccentTitle = (text) => {
+    if (!text) return null
+    const words = String(text).trim().split(/\s+/).filter(Boolean)
+    if (words.length < 2) return <span className="auth-title__main">{text}</span>
+    const lastWord = words.pop()
+    const prefix = words.join(" ")
+    return (
+      <>
+        <span className="auth-title__main">{prefix}</span> <span className="auth-accent">{lastWord}</span>
+      </>
+    )
+  }
+
+  const handleSocialLogin = (provider) => {
+    showInfo(`${provider} login is not configured yet in this project.`)
+  }
 
   const validatePassword = (password) => {
     if (password.length < 8) return "Password must be at least 8 characters long."
@@ -167,7 +185,10 @@ function Signup() {
               <FiArrowLeft />
             </button>
             <div className="auth-header">
-              <h1>{t.createAccount}</h1>
+              <div className="auth-header__icon" aria-hidden>
+                <FiUserPlus />
+              </div>
+              <h1 className="auth-title">{renderAccentTitle(t.createAccount)}</h1>
               <p>{t.createAccountSub}</p>
             </div>
 
@@ -177,7 +198,7 @@ function Signup() {
             <div className="form-group">
               <label className="form-label">{t.nationality}</label>
               <select
-                className="form-input"
+                className="form-input auth-input__control"
                 value={formState.nationality}
                 onChange={(event) => handleChange("nationality", event.target.value)}
                 disabled={isLoading}
@@ -191,42 +212,58 @@ function Signup() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">
+              <label className="form-label sr-only">
                 <FiUser className="form-icon" /> {t.fullName}
               </label>
-              <input
-                type="text"
-                className={`form-input ${errors.name ? "input-invalid" : ""}`}
-                value={formState.name}
-                onChange={(event) => handleChange("name", event.target.value)}
-                disabled={isLoading}
-              />
+              <div className="auth-input">
+                <span className="auth-input__icon" aria-hidden>
+                  <FiUser />
+                </span>
+                <input
+                  type="text"
+                  placeholder={t.fullName}
+                  className={`form-input auth-input__control ${errors.name ? "input-invalid" : ""}`}
+                  value={formState.name}
+                  onChange={(event) => handleChange("name", event.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
               {errors.name && <p className="field-error">{errors.name}</p>}
             </div>
 
             <div className="form-group">
-              <label className="form-label">
+              <label className="form-label sr-only">
                 <FiMail className="form-icon" /> {t.email}
               </label>
-              <input
-                type="email"
-                className={`form-input ${errors.email ? "input-invalid" : ""}`}
-                value={formState.email}
-                onChange={(event) => handleChange("email", event.target.value)}
-                disabled={isLoading}
-                required
-              />
+              <div className="auth-input">
+                <span className="auth-input__icon" aria-hidden>
+                  <FiMail />
+                </span>
+                <input
+                  type="email"
+                  placeholder={t.email}
+                  className={`form-input auth-input__control ${errors.email ? "input-invalid" : ""}`}
+                  value={formState.email}
+                  onChange={(event) => handleChange("email", event.target.value)}
+                  disabled={isLoading}
+                  required
+                />
+              </div>
               {errors.email && <p className="field-error">{errors.email}</p>}
             </div>
 
             <div className="form-group">
-              <label className="form-label">
+              <label className="form-label sr-only">
                 <FiLock className="form-icon" /> {t.password}
               </label>
               <div className="password-input-wrapper">
+                <span className="auth-input__icon" aria-hidden>
+                  <FiLock />
+                </span>
                 <input
                   type={showPassword ? "text" : "password"}
-                  className={`form-input ${errors.password ? "input-invalid" : ""}`}
+                  placeholder={t.password}
+                  className={`form-input auth-input__control ${errors.password ? "input-invalid" : ""}`}
                   value={formState.password}
                   onChange={(event) => handleChange("password", event.target.value)}
                   disabled={isLoading}
@@ -257,13 +294,17 @@ function Signup() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">
+              <label className="form-label sr-only">
                 <FiLock className="form-icon" /> {t.confirmPassword}
               </label>
               <div className="password-input-wrapper">
+                <span className="auth-input__icon" aria-hidden>
+                  <FiLock />
+                </span>
                 <input
                   type={showConfirmPassword ? "text" : "password"}
-                  className={`form-input ${errors.confirmPassword ? "input-invalid" : ""}`}
+                  placeholder={t.confirmPassword}
+                  className={`form-input auth-input__control ${errors.confirmPassword ? "input-invalid" : ""}`}
                   value={formState.confirmPassword}
                   onChange={(event) => handleChange("confirmPassword", event.target.value)}
                   disabled={isLoading}
@@ -281,9 +322,51 @@ function Signup() {
             </div>
 
             <button type="submit" className="auth-button" disabled={isLoading}>
-              {isLoading ? t.creatingAccount : <><FiUserPlus /> {t.signUp}</>}
+              {isLoading ? (
+                t.creatingAccount
+              ) : (
+                <>
+                  <span className="auth-button__content">{t.createAccount || "Create Account"}</span>
+                  <FiArrowRight className="auth-button__arrow" aria-hidden />
+                </>
+              )}
             </button>
             </form>
+
+            <div className="auth-divider" aria-hidden>
+              <span>OR CONTINUE WITH</span>
+            </div>
+            <div className="auth-social">
+              <button type="button" className="auth-social-btn" onClick={() => handleSocialLogin("Google")}>
+                <span className="auth-social-btn__icon" aria-hidden>
+                  <svg viewBox="0 0 48 48" width="18" height="18">
+                    <path
+                      fill="#FFC107"
+                      d="M43.611 20.083H42V20H24v8h11.303C33.659 32.659 29.197 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.962 3.038l5.657-5.657C34.046 6.053 29.268 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20c0-1.341-.138-2.65-.389-3.917z"
+                    />
+                    <path
+                      fill="#FF3D00"
+                      d="M6.306 14.691l6.571 4.819C14.655 15.109 18.961 12 24 12c3.059 0 5.842 1.154 7.962 3.038l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+                    />
+                    <path
+                      fill="#4CAF50"
+                      d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.165 35.091 26.715 36 24 36c-5.176 0-9.625-3.316-11.283-7.946l-6.522 5.024C9.505 39.556 16.227 44 24 44z"
+                    />
+                    <path
+                      fill="#1976D2"
+                      d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.084 5.57l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+                    />
+                  </svg>
+                </span>
+                Google
+              </button>
+              <button type="button" className="auth-social-btn" onClick={() => handleSocialLogin("Apple")}>
+                <span className="auth-social-btn__icon" aria-hidden>
+                  <FaApple />
+                </span>
+                Apple
+              </button>
+            </div>
 
             <div className="auth-footer">
               <p>

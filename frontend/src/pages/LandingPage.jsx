@@ -763,7 +763,7 @@ function LandingPage() {
 
       <section className="landing-section landing-section-emphasis" aria-labelledby="landing-proof-heading">
         <div className="landing-section-inner">
-          <h2 id="landing-proof-heading" className="scroll-reveal">Not Advice. Not Generic Motivation.</h2>
+          <h2 id="landing-proof-heading" className="scroll-reveal">Not Advice. Not Generic Motivation</h2>
           <p className="landing-section-subtitle scroll-reveal">
             Built using behavioral signals, pattern recognition, and timing intelligence models. Helps users pause bad decisions and act at better
             moments.
@@ -809,21 +809,21 @@ function LandingPage() {
                 <FaEyeSlash />
               </span>
               <h3>Clarity</h3>
-              <p>You can&apos;t see clearly. Fog in your judgment distorts what feels like a good choice.</p>
+              <p>You can&apos;t see clearly. Fog in your judgment distorts what feels like a good choice</p>
             </article>
             <article className="landing-card landing-trap-card scroll-reveal shadow-card" role="listitem">
               <span className="landing-card-icon" aria-hidden="true">
                 <FaBolt />
               </span>
               <h3>Behavior</h3>
-              <p>You react emotionally or impulsively. Speed without awareness compounds errors.</p>
+              <p>You react emotionally or impulsively. Speed without awareness compounds errors</p>
             </article>
             <article className="landing-card landing-trap-card scroll-reveal shadow-card" role="listitem">
               <span className="landing-card-icon" aria-hidden="true">
                 <FaClock />
               </span>
               <h3>Timing</h3>
-              <p>Even good moves fail when timing is wrong. The right action at the wrong moment costs you.</p>
+              <p>Even good moves fail when timing is wrong. The right action at the wrong moment costs you</p>
             </article>
           </div>
         </div>
@@ -831,7 +831,7 @@ function LandingPage() {
 
       <section className="landing-section" aria-labelledby="landing-usecases-heading">
         <div className="landing-section-inner">
-          <h2 id="landing-usecases-heading" className="scroll-reveal">Use Vedastro Before Decisions Like:</h2>
+          <h2 id="landing-usecases-heading" className="scroll-reveal">Use Vedastro Before Decisions Like</h2>
           <p className="landing-section-subtitle scroll-reveal">When stakes are high, guessing is expensive.</p>
 
           <div className="landing-usecase-grid scroll-reveal" role="list">
